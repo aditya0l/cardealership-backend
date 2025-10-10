@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Car Dealership API Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .endpoint-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .response { margin: 10px 0; padding: 10px; border-radius: 4px; white-space: pre-wrap; font-family: monospace; font-size: 12px; }
+        input[type="text"] { padding: 8px; margin: 5px; border: 1px solid #ddd; border-radius: 4px; width: 300px; }
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .status-ok { background: #28a745; }
+        .status-error { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚗 Car Dealership API Tester</h1>
+            <p>Test your backend API endpoints directly from the browser</p>
+            <div id="server-status">
+                <span class="status-indicator status-error"></span>
+                <span>Checking server status...</span>
+            </div>
+        </div>
+
+        <!-- Auth Section -->
+        <div class="endpoint-section">
+            <h3>🔐 Authentication</h3>
+            <p><strong>Note:</strong> Most endpoints require Firebase authentication tokens. For testing without auth, you can check the health endpoint below.</p>
+            <input type="text" id="authToken" placeholder="Firebase ID Token (optional for testing)" />
+        </div>
+
+        <!-- Health Check -->
+        <div class="endpoint-section">
+            <h3>✅ Health Check (Public)</h3>
+            <button onclick="testEndpoint('GET', '/api/health')">Test Health</button>
+            <div id="health-response" class="response"></div>
+        </div>
+
+        <!-- Enquiries -->
+        <div class="endpoint-section">
+            <h3>📋 Enquiries (Protected)</h3>
+            <button onclick="testEndpoint('GET', '/api/enquiries')">Get All Enquiries</button>
+            <button onclick="testEndpoint('POST', '/api/enquiries', {title: 'Test Enquiry', description: 'Testing from browser'})">Create Test Enquiry</button>
+            <div id="enquiries-response" class="response"></div>
+        </div>
+
+        <!-- Bookings -->
+        <div class="endpoint-section">
+            <h3>📊 Bookings (Protected)</h3>
+            <button onclick="testEndpoint('GET', '/api/bookings')">Get All Bookings</button>
+            <button onclick="testEndpoint('POST', '/api/bookings', {customerName: 'Test Customer', dealerCode: 'TEST001', vehicle: 'Test Car'})">Create Test Booking</button>
+            <div id="bookings-response" class="response"></div>
+        </div>
+
+        <!-- Stock -->
+        <div class="endpoint-section">
+            <h3>🚗 Stock/Vehicles (Protected)</h3>
+            <button onclick="testEndpoint('GET', '/api/stock')">Get All Vehicles</button>
+            <div id="stock-response" class="response"></div>
+        </div>
+
+        <!-- Bulk Import -->
+        <div class="endpoint-section">
+            <h3>📁 Bulk Import (Protected)</h3>
+            <button onclick="testEndpoint('GET', '/api/bookings/imports')">Get Import History</button>
+            <div id="import-response" class="response"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:4000';
+        
+        // Check server status on load
+        window.onload = function() {
+            checkServerStatus();
+        };
+
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/health`);
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('server-status');
+                if (response.ok && data.status === 'ok') {
+                    statusDiv.innerHTML = '<span class="status-indicator status-ok"></span><span>Server is running ✅</span>';
+                } else {
+                    statusDiv.innerHTML = '<span class="status-indicator status-error"></span><span>Server error ❌</span>';
+                }
+            } catch (error) {
+                const statusDiv = document.getElementById('server-status');
+                statusDiv.innerHTML = '<span class="status-indicator status-error"></span><span>Server not accessible ❌</span>';
+            }
+        }
+
+        async function testEndpoint(method, endpoint, body = null) {
+            const authToken = document.getElementById('authToken').value;
+            const responseId = getResponseId(endpoint);
+            const responseDiv = document.getElementById(responseId);
+            
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            
+            const options = {
+                method: method,
+                headers: headers
+            };
+            
+            if (body && (method === 'POST' || method === 'PUT')) {
+                options.body = JSON.stringify(body);
+            }
+            
+            try {
+                responseDiv.innerHTML = 'Loading...';
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const data = await response.json();
+                
+                const statusClass = response.ok ? 'success' : 'error';
+                responseDiv.className = `response ${statusClass}`;
+                responseDiv.innerHTML = `Status: ${response.status}\n\n${JSON.stringify(data, null, 2)}`;
+                
+            } catch (error) {
+                responseDiv.className = 'response error';
+                responseDiv.innerHTML = `Error: ${error.message}`;
+            }
+        }
+
+        function getResponseId(endpoint) {
+            if (endpoint.includes('health')) return 'health-response';
+            if (endpoint.includes('enquiries')) return 'enquiries-response';
+            if (endpoint.includes('bookings') && !endpoint.includes('import')) return 'bookings-response';
+            if (endpoint.includes('stock')) return 'stock-response';
+            if (endpoint.includes('import')) return 'import-response';
+            return 'response';
+        }
+    </script>
+</body>
+</html>

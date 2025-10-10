@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Token Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+        .user-card { border: 1px solid #ddd; margin: 10px 0; padding: 15px; border-radius: 5px; }
+        .role-admin { border-left: 5px solid #dc3545; }
+        .role-general { border-left: 5px solid #6f42c1; }
+        .role-sales { border-left: 5px solid #007bff; }
+        .role-team { border-left: 5px solid #28a745; }
+        .role-advisor { border-left: 5px solid #ffc107; }
+        button { background: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .token-output { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0; max-height: 100px; overflow-y: auto; }
+        .copy-btn { background: #28a745; font-size: 12px; padding: 5px 10px; }
+        .instructions { background: #e7f3ff; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Firebase Token Generator for Postman</h1>
+        
+        <div class="instructions">
+            <h3>📋 Setup Instructions:</h3>
+            <ol>
+                <li><strong>Create Firebase Users:</strong> Use the credentials below to create users in Firebase Console</li>
+                <li><strong>Sign In:</strong> Use Firebase Auth to sign in with each user</li>
+                <li><strong>Get ID Token:</strong> Use Firebase Auth methods to get ID tokens</li>
+                <li><strong>Copy to Postman:</strong> Set tokens in Postman environment variables</li>
+            </ol>
+        </div>
+
+        <h2>👥 Test Users by Role</h2>
+
+        <div class="user-card role-admin">
+            <h3>🔴 ADMIN</h3>
+            <p><strong>Email:</strong> admin@dealership.com</p>
+            <p><strong>Password:</strong> Admin123!</p>
+            <p><strong>Permissions:</strong> Full system access - can do everything</p>
+            <div class="token-output" id="admin-token">Token will appear here after authentication</div>
+            <button onclick="copyToken('admin-token')">📋 Copy Token</button>
+        </div>
+
+        <div class="user-card role-general">
+            <h3>🟣 GENERAL_MANAGER</h3>
+            <p><strong>Email:</strong> generalmanager@dealership.com</p>
+            <p><strong>Password:</strong> Manager123!</p>
+            <p><strong>Permissions:</strong> Management oversight, can read all data, add remarks</p>
+            <div class="token-output" id="general-token">Token will appear here after authentication</div>
+            <button onclick="copyToken('general-token')">📋 Copy Token</button>
+        </div>
+
+        <div class="user-card role-sales">
+            <h3>🔵 SALES_MANAGER</h3>
+            <p><strong>Email:</strong> salesmanager@dealership.com</p>
+            <p><strong>Password:</strong> Sales123!</p>
+            <p><strong>Permissions:</strong> Sales operations, manage vehicles, bulk imports</p>
+            <div class="token-output" id="sales-token">Token will appear here after authentication</div>
+            <button onclick="copyToken('sales-token')">📋 Copy Token</button>
+        </div>
+
+        <div class="user-card role-team">
+            <h3>🟢 TEAM_LEAD</h3>
+            <p><strong>Email:</strong> teamlead@dealership.com</p>
+            <p><strong>Password:</strong> Lead123!</p>
+            <p><strong>Permissions:</strong> Team coordination, assign advisors, update bookings</p>
+            <div class="token-output" id="team-token">Token will appear here after authentication</div>
+            <button onclick="copyToken('team-token')">📋 Copy Token</button>
+        </div>
+
+        <div class="user-card role-advisor">
+            <h3>🟡 CUSTOMER_ADVISOR</h3>
+            <p><strong>Email:</strong> advisor@dealership.com</p>
+            <p><strong>Password:</strong> Advisor123!</p>
+            <p><strong>Permissions:</strong> Front-line access, own bookings only, customer interactions</p>
+            <div class="token-output" id="advisor-token">Token will appear here after authentication</div>
+            <button onclick="copyToken('advisor-token')">📋 Copy Token</button>
+        </div>
+
+        <div class="instructions">
+            <h3>🚀 Testing in Postman:</h3>
+            <ol>
+                <li><strong>Set Environment Variable:</strong> In Postman, set <code>firebaseToken</code> to the JWT token</li>
+                <li><strong>Test Different Roles:</strong> Switch tokens to test different permission levels</li>
+                <li><strong>Check Responses:</strong> Different roles will get different data and permissions</li>
+            </ol>
+            
+            <h3>🧪 Endpoints to Test by Role:</h3>
+            <ul>
+                <li><strong>ADMIN:</strong> All endpoints, user management, system operations</li>
+                <li><strong>GENERAL_MANAGER:</strong> Read all data, view reports, add remarks</li>
+                <li><strong>SALES_MANAGER:</strong> Manage bookings, bulk import, vehicle management</li>
+                <li><strong>TEAM_LEAD:</strong> Assign advisors, update booking status</li>
+                <li><strong>CUSTOMER_ADVISOR:</strong> Own bookings only, customer interactions</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function copyToken(elementId) {
+            const tokenElement = document.getElementById(elementId);
+            const token = tokenElement.textContent.trim();
+            
+            if (token && token !== 'Token will appear here after authentication') {
+                navigator.clipboard.writeText(token).then(() => {
+                    alert('Token copied to clipboard!');
+                }).catch(err => {
+                    console.error('Failed to copy token:', err);
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = token;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('Token copied to clipboard!');
+                });
+            } else {
+                alert('No token available to copy. Please authenticate first.');
+            }
+        }
+
+        // Note: Actual token generation would require Firebase SDK initialization
+        // This is just the UI template for organizing the testing process
+    </script>
+</body>
+</html>

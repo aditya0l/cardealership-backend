@@ -1,0 +1,43 @@
+services:
+  # Main Backend Service
+  - type: web
+    name: car-dealership-backend
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dealership-db
+          property: connectionString
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_DATABASE_URL
+        sync: false
+
+  # Redis Service (for bulk imports)
+  - type: redis
+    name: dealership-redis
+    region: singapore
+    plan: free
+    ipAllowList: []
+
+databases:
+  # PostgreSQL Database
+  - name: dealership-db
+    region: singapore
+    plan: free
+    databaseName: dealership_db
+    user: dealership_user
+

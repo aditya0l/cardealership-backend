@@ -1,0 +1,611 @@
+{
+  "info": {
+    "name": "Car Dealership API",
+    "description": "Complete API collection for Car Dealership Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT token from login response"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔍 Health & Info",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check if the server is running"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔐 Authentication",
+      "item": [
+        {
+          "name": "🚀 Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Auto-save token from login response",
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.data.token) {",
+                  "        pm.environment.set('authToken', response.data.token);",
+                  "        pm.environment.set('currentUser', JSON.stringify(response.data.user));",
+                  "        console.log('✅ Login successful! Token saved to environment.');",
+                  "        console.log('User:', response.data.user.name, '(' + response.data.user.role.name + ')');",
+                  "    }",
+                  "} else {",
+                  "    console.log('❌ Login failed');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@cardealership.com\",\n  \"password\": \"Admin123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get All Users (Admin Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📋 Enquiries",
+      "item": [
+        {
+          "name": "Get All Enquiries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/enquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "enquiries"]
+            }
+          }
+        },
+        {
+          "name": "Create Enquiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"John Doe\",\n  \"customerContact\": \"+1234567890\",\n  \"customerEmail\": \"john.doe@email.com\",\n  \"model\": \"Tata Nexon\",\n  \"variant\": \"Nexon EV Max XZ+\",\n  \"color\": \"Flame Red\",\n  \"source\": \"WALK_IN\",\n  \"expectedBookingDate\": \"2024-02-15\",\n  \"caRemarks\": \"Customer interested in electric vehicle with good range\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/enquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "enquiries"]
+            }
+          }
+        },
+        {
+          "name": "Update Enquiry",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"John Doe Updated\",\n  \"customerContact\": \"+1234567890\",\n  \"customerEmail\": \"john.doe.updated@email.com\",\n  \"variant\": \"Nexon EV Max XZ+ Dark\",\n  \"color\": \"Dark Edition\",\n  \"status\": \"IN_PROGRESS\",\n  \"caRemarks\": \"Customer requested dark edition variant\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/enquiries/enquiry-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "enquiries", "enquiry-id"]
+            }
+          }
+        },
+        {
+          "name": "Delete Enquiry",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/enquiries/enquiry-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "enquiries", "enquiry-id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Bookings",
+      "item": [
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"John Doe\",\n  \"customerPhone\": \"+91-9876543210\",\n  \"customerEmail\": \"john@example.com\",\n  \"dealerCode\": \"TATA001\",\n  \"variant\": \"Nexon EV Max\",\n  \"color\": \"Flame Red\",\n  \"fuelType\": \"Electric\",\n  \"transmission\": \"Automatic\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings"]
+            }
+          }
+        },
+        {
+          "name": "Get Booking by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/booking-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "booking-id"]
+            }
+          }
+        },
+        {
+          "name": "Update Booking",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CONFIRMED\",\n  \"bookingDate\": \"2025-10-15T10:00:00Z\",\n  \"expectedDeliveryDate\": \"2025-11-15T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/booking-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "booking-id"]
+            }
+          }
+        },
+        {
+          "name": "Assign Advisor to Booking",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"advisorId\": \"advisor-firebase-uid\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/booking-id/assign",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "booking-id", "assign"]
+            }
+          }
+        },
+        {
+          "name": "Add Remarks to Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"remark\": \"Customer called to confirm delivery date\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/booking-id/remarks",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "booking-id", "remarks"]
+            }
+          }
+        },
+        {
+          "name": "Get Advisor Bookings (Mobile)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/advisor/my-bookings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "advisor", "my-bookings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📁 Bulk Import",
+      "item": [
+        {
+          "name": "Upload Import File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "skipFirstRow",
+                  "value": "true",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/import/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "import", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Preview Import File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/import/preview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "import", "preview"]
+            }
+          }
+        },
+        {
+          "name": "Get Import History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/imports",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "imports"]
+            }
+          }
+        },
+        {
+          "name": "Get Import by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bookings/imports/import-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bookings", "imports", "import-id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚗 Stock/Vehicles",
+      "item": [
+        {
+          "name": "Get All Vehicles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stock"]
+            }
+          }
+        },
+        {
+          "name": "Create Vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activeVC\": \"NEXON_EV_001\",\n  \"variant\": \"Nexon EV Max\",\n  \"color\": \"Flame Red\",\n  \"fuelType\": \"Electric\",\n  \"transmission\": \"Automatic\",\n  \"exShowroomPrice\": 1500000,\n  \"dealerId\": \"cmgbzxif60000e3wblb0zwktc\",\n  \"dealerType\": \"TATA\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stock"]
+            }
+          }
+        },
+        {
+          "name": "Get Vehicle by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/stock/vehicle-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stock", "vehicle-id"]
+            }
+          }
+        },
+        {
+          "name": "Update Vehicle",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exShowroomPrice\": 1550000,\n  \"consumerDiscount\": 50000,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/stock/vehicle-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stock", "vehicle-id"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Quotations",
+      "item": [
+        {
+          "name": "Get All Quotations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotations"]
+            }
+          }
+        },
+        {
+          "name": "Create Quotation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enquiryId\": \"enquiry-id\",\n  \"amount\": 1500000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/quotations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotations"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
