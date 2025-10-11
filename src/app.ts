@@ -142,7 +142,7 @@ app.post('/api/assign-bookings-to-advisor', async (req, res) => {
     
     await prisma.$disconnect();
     
-    res.json({
+    return res.json({
       success: true,
       message: 'All bookings and enquiries assigned to advisor',
       advisor: {
@@ -156,7 +156,7 @@ app.post('/api/assign-bookings-to-advisor', async (req, res) => {
     
   } catch (error: any) {
     console.error('Error assigning bookings:', error.message);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error assigning bookings',
       error: error.message
