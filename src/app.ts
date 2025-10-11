@@ -192,6 +192,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
     
     // Create bookings
     const createdBookings = [];
+    const errors = [];
     for (const bookingData of sampleBookings) {
       try {
         const booking = await prisma.booking.create({
@@ -201,6 +202,10 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         console.log(`✅ Created booking for ${bookingData.customerName}`);
       } catch (error: any) {
         console.error(`❌ Error creating booking for ${bookingData.customerName}:`, error.message);
+        errors.push({
+          customer: bookingData.customerName,
+          error: error.message
+        });
       }
     }
     
@@ -215,7 +220,8 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         employeeId: advisor.employeeId
       },
       bookingsCreated: createdBookings.length,
-      totalBookings: createdBookings.length
+      totalBookings: createdBookings.length,
+      errors: errors.length > 0 ? errors : undefined
     });
     
   } catch (error: any) {
