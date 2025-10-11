@@ -8,6 +8,7 @@ services:
     buildCommand: NODE_ENV=development npm install && npx prisma generate && npm run build
     startCommand: npx prisma migrate resolve --rolled-back 20251002200510_update_rbac_roles || true && npx prisma migrate resolve --rolled-back 20251011_add_employee_hierarchy_stock_and_models || true && npx prisma migrate deploy && npm start
     healthCheckPath: /api/health
+    # Force redeploy to pick up correct startCommand
     envVars:
       - key: NODE_ENV
         value: production
