@@ -139,6 +139,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingAmount: 150000,
         status: 'CONFIRMED',
         advisorId: advisor.firebaseUid,
+        dealerCode: 'TATA001',
         notes: 'Customer interested in XZ+ variant with sunroof'
       },
       {
@@ -152,6 +153,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingAmount: 220000,
         status: 'PENDING',
         advisorId: advisor.firebaseUid,
+        dealerCode: 'TATA001',
         notes: 'Customer wants test drive before final confirmation'
       },
       {
@@ -165,6 +167,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingAmount: 280000,
         status: 'CONFIRMED',
         advisorId: advisor.firebaseUid,
+        dealerCode: 'TATA001',
         notes: 'Family car for weekend trips'
       },
       {
@@ -178,6 +181,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingAmount: 120000,
         status: 'DELIVERED',
         advisorId: advisor.firebaseUid,
+        dealerCode: 'TATA001',
         notes: 'First car purchase for young professional'
       },
       {
@@ -191,6 +195,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingAmount: 95000,
         status: 'CANCELLED',
         advisorId: advisor.firebaseUid,
+        dealerCode: 'TATA001',
         notes: 'Customer cancelled due to financial constraints'
       }
     ];
