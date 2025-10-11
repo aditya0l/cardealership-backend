@@ -18,7 +18,7 @@ BEGIN
     WHERE constraint_name = 'users_manager_id_fkey'
   ) THEN
     ALTER TABLE "users" ADD CONSTRAINT "users_manager_id_fkey" 
-    FOREIGN KEY ("manager_id") REFERENCES "users"("id") 
+    FOREIGN KEY ("manager_id") REFERENCES "users"("firebase_uid") 
     ON DELETE SET NULL ON UPDATE CASCADE;
   END IF;
 END $$;
