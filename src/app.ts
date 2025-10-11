@@ -102,6 +102,42 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Fix database enums endpoint
+app.post('/api/fix-enums', async (req, res) => {
+  try {
+    console.log('🔧 Fixing database enums...');
+    
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Add missing enum values
+    await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'HOT';`;
+    await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'WARM';`;
+    await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'COLD';`;
+    
+    // Check current enum values
+    const categories = await prisma.$queryRaw`
+      SELECT unnest(enum_range(NULL::"EnquiryCategory")) as category;
+    `;
+    
+    await prisma.$disconnect();
+    
+    res.json({
+      success: true,
+      message: 'Enums fixed successfully',
+      categories: categories
+    });
+    
+  } catch (error: any) {
+    console.error('Error fixing enums:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing enums',
+      error: error.message
+    });
+  }
+});
+
 // Fix deployed users endpoint
 app.post('/api/fix-users', async (req, res) => {
   try {
