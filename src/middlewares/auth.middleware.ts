@@ -28,10 +28,19 @@ export const authenticate = async (
     
     // TEST MODE: Allow test-user for development
     if (authHeader === 'Bearer test-user') {
+      // First try to get advisor.new@test.com specifically
       let testUser = await prisma.user.findFirst({
-        where: { email: 'admin@dealership.com' },
+        where: { email: 'advisor.new@test.com' },
         include: { role: true }
       });
+      
+      // If that doesn't exist, try admin@dealership.com
+      if (!testUser) {
+        testUser = await prisma.user.findFirst({
+          where: { email: 'admin@dealership.com' },
+          include: { role: true }
+        });
+      }
       
       // If admin user doesn't exist, try general manager
       if (!testUser) {
@@ -49,6 +58,13 @@ export const authenticate = async (
           where: { 
             role: { name: RoleName.SALES_MANAGER }
           },
+          include: { role: true }
+        });
+      }
+      
+      // If still no user, just get any user (fallback)
+      if (!testUser) {
+        testUser = await prisma.user.findFirst({
           include: { role: true }
         });
       }
