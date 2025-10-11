@@ -102,6 +102,43 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Database schema check endpoint
+app.get('/api/db-schema-check', async (req, res) => {
+  try {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Try to query a user with the new employee_id field
+    const user = await prisma.user.findFirst({
+      select: {
+        firebaseUid: true,
+        employeeId: true,
+        managerId: true,
+        name: true,
+      }
+    });
+    
+    await prisma.$disconnect();
+    
+    res.json({
+      status: 'ok',
+      message: 'Database schema is up to date',
+      hasEmployeeId: true,
+      hasManagerId: true,
+      sampleUser: user,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Database schema check failed',
+      error: error.message,
+      code: error.code,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Firebase status endpoint for debugging
 app.get('/api/firebase-status', async (req, res) => {
   try {
