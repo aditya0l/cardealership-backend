@@ -107,7 +107,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
   try {
     console.log('🔧 Creating sample bookings for advisor...');
     
-    const { PrismaClient } = await import('@prisma/client');
+    const { PrismaClient, BookingStatus } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
     // Find the advisor user
@@ -137,7 +137,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingDate: new Date('2025-10-15'),
         deliveryDate: new Date('2025-10-20'),
         bookingAmount: 150000,
-        status: 'CONFIRMED',
+        status: BookingStatus.CONFIRMED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
         notes: 'Customer interested in XZ+ variant with sunroof'
@@ -151,7 +151,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingDate: new Date('2025-10-12'),
         deliveryDate: new Date('2025-10-18'),
         bookingAmount: 220000,
-        status: 'PENDING',
+        status: BookingStatus.PENDING,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
         notes: 'Customer wants test drive before final confirmation'
@@ -165,7 +165,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingDate: new Date('2025-10-10'),
         deliveryDate: new Date('2025-10-25'),
         bookingAmount: 280000,
-        status: 'CONFIRMED',
+        status: BookingStatus.CONFIRMED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
         notes: 'Family car for weekend trips'
@@ -179,7 +179,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingDate: new Date('2025-10-08'),
         deliveryDate: new Date('2025-10-16'),
         bookingAmount: 120000,
-        status: 'DELIVERED',
+        status: BookingStatus.DELIVERED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
         notes: 'First car purchase for young professional'
@@ -193,7 +193,7 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         bookingDate: new Date('2025-10-05'),
         deliveryDate: new Date('2025-10-12'),
         bookingAmount: 95000,
-        status: 'CANCELLED',
+        status: BookingStatus.CANCELLED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
         notes: 'Customer cancelled due to financial constraints'
