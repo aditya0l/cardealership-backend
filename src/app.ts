@@ -111,6 +111,7 @@ app.post('/api/fix-users', async (req, res) => {
     const prisma = new PrismaClient();
     
     // Get Firebase users
+    const { auth } = await import('./config/firebase');
     const listUsersResult = await auth.listUsers(100);
     console.log(`Found ${listUsersResult.users.length} Firebase users`);
     
