@@ -102,6 +102,68 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Assign all bookings to advisor endpoint
+app.post('/api/assign-bookings-to-advisor', async (req, res) => {
+  try {
+    console.log('🔧 Assigning all bookings to advisor...');
+    
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Find the advisor user
+    const advisor = await prisma.user.findUnique({
+      where: { email: 'advisor.new@test.com' },
+      select: { firebaseUid: true, employeeId: true, name: true }
+    });
+    
+    if (!advisor) {
+      await prisma.$disconnect();
+      return res.status(404).json({
+        success: false,
+        message: 'Advisor user not found'
+      });
+    }
+    
+    console.log(`Found advisor: ${advisor.name} (${advisor.employeeId})`);
+    
+    // Update all bookings to assign them to this advisor
+    const updateResult = await prisma.booking.updateMany({
+      data: {
+        advisorId: advisor.firebaseUid
+      }
+    });
+    
+    // Also update all enquiries to assign them to this advisor
+    const enquiryUpdateResult = await prisma.enquiry.updateMany({
+      data: {
+        assignedToUserId: advisor.firebaseUid
+      }
+    });
+    
+    await prisma.$disconnect();
+    
+    res.json({
+      success: true,
+      message: 'All bookings and enquiries assigned to advisor',
+      advisor: {
+        name: advisor.name,
+        email: 'advisor.new@test.com',
+        employeeId: advisor.employeeId
+      },
+      updatedBookings: updateResult.count,
+      updatedEnquiries: enquiryUpdateResult.count
+    });
+    
+  } catch (error: any) {
+    console.error('Error assigning bookings:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error assigning bookings',
+      error: error.message
+    });
+  }
+});
+
 // Fix database enums endpoint
 app.post('/api/fix-enums', async (req, res) => {
   try {
