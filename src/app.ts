@@ -310,6 +310,18 @@ app.post('/api/fix-enums', async (req, res) => {
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'COLD';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'BOOKED';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'LOST';`;
+             
+             // Try to add LOST with a different approach
+             try {
+               await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE 'LOST';`;
+               console.log('✅ Added LOST enum value');
+             } catch (error: any) {
+               if (error.message.includes('already exists')) {
+                 console.log('ℹ️ LOST enum value already exists');
+               } else {
+                 console.log('❌ Error adding LOST:', error.message);
+               }
+             }
     
     // Check current enum values
     const categories = await prisma.$queryRaw`
