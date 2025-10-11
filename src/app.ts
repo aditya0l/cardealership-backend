@@ -102,6 +102,113 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Fix deployed users endpoint
+app.post('/api/fix-users', async (req, res) => {
+  try {
+    console.log('🔧 Fixing users in deployed database...');
+    
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Get Firebase users
+    const listUsersResult = await auth.listUsers(100);
+    console.log(`Found ${listUsersResult.users.length} Firebase users`);
+    
+    // Get roles
+    const roles = await prisma.role.findMany();
+    console.log(`Found ${roles.length} roles`);
+    
+    let fixedCount = 0;
+    
+    for (const firebaseUser of listUsersResult.users) {
+      try {
+        const email = firebaseUser.email;
+        if (!email) continue;
+        
+        const name = firebaseUser.displayName || email.split('@')[0];
+        const firebaseUid = firebaseUser.uid;
+        
+        // Determine role based on email
+        let roleName: string = 'CUSTOMER_ADVISOR';
+        if (email.includes('admin')) roleName = 'ADMIN';
+        if (email.includes('manager')) roleName = 'GENERAL_MANAGER';
+        if (email.includes('lead')) roleName = 'TEAM_LEAD';
+        if (email.includes('sales')) roleName = 'SALES_MANAGER';
+        
+        const role = roles.find(r => r.name === roleName);
+        if (!role) continue;
+        
+        // Generate employee ID
+        const existingCount = await prisma.user.count({
+          where: {
+            employeeId: { startsWith: roleName === 'CUSTOMER_ADVISOR' ? 'ADV' : 'EMP' },
+            role: { name: roleName as any }
+          }
+        });
+        
+        const employeeId = roleName === 'CUSTOMER_ADVISOR' 
+          ? `ADV${String(existingCount + 1).padStart(3, '0')}`
+          : `EMP${String(existingCount + 1).padStart(3, '0')}`;
+        
+        // Insert or update user
+        await prisma.user.upsert({
+          where: { firebaseUid },
+          update: {
+            name,
+            email,
+            roleId: role.id,
+            employeeId,
+            isActive: true,
+            updatedAt: new Date()
+          },
+          create: {
+            firebaseUid,
+            name,
+            email,
+            roleId: role.id,
+            employeeId,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+        
+        fixedCount++;
+        console.log(`✅ Fixed ${email} -> ${roleName} (${employeeId})`);
+        
+      } catch (error: any) {
+        console.error(`❌ Error processing ${firebaseUser.email}:`, error.message);
+      }
+    }
+    
+    await prisma.$disconnect();
+    
+    // Verify the specific user we need
+    const verifiedUser = await prisma.user.findUnique({
+      where: { firebaseUid: 'g5Fr20vtaMZkjCxLRJJr9WORGJc2' },
+      include: { role: true }
+    });
+    
+    res.json({
+      success: true,
+      message: `Fixed ${fixedCount} users`,
+      advisorUser: verifiedUser ? {
+        email: verifiedUser.email,
+        employeeId: verifiedUser.employeeId,
+        role: verifiedUser.role.name
+      } : null
+    });
+    
+  } catch (error: any) {
+    console.error('Error fixing users:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing users',
+      error: error.message
+    });
+  }
+});
+
 // Debug authentication endpoint
 app.get('/api/debug-auth', async (req, res) => {
   try {
