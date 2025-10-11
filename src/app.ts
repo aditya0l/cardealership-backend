@@ -116,6 +116,12 @@ app.get('/api/firebase-status', async (req, res) => {
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
       hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      privateKeyFormat: {
+        startsWithBegin: process.env.FIREBASE_PRIVATE_KEY?.startsWith('-----BEGIN'),
+        hasBackslashN: process.env.FIREBASE_PRIVATE_KEY?.includes('\\n'),
+        hasRealNewline: process.env.FIREBASE_PRIVATE_KEY?.includes('\n'),
+        length: process.env.FIREBASE_PRIVATE_KEY?.length,
+      },
       userCount: listUsersResult.users.length,
       timestamp: new Date().toISOString()
     });
@@ -124,9 +130,17 @@ app.get('/api/firebase-status', async (req, res) => {
       status: 'error',
       message: 'Firebase initialization failed',
       error: error.message,
+      errorCode: error.code,
       firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
       hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
       hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      privateKeyFormat: {
+        startsWithBegin: process.env.FIREBASE_PRIVATE_KEY?.startsWith('-----BEGIN'),
+        hasBackslashN: process.env.FIREBASE_PRIVATE_KEY?.includes('\\n'),
+        hasRealNewline: process.env.FIREBASE_PRIVATE_KEY?.includes('\n'),
+        length: process.env.FIREBASE_PRIVATE_KEY?.length,
+        first50Chars: process.env.FIREBASE_PRIVATE_KEY?.substring(0, 50),
+      },
       timestamp: new Date().toISOString()
     });
   }
