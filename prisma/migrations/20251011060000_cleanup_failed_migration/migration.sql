@@ -21,9 +21,22 @@ BEGIN
     SELECT 1 FROM information_schema.table_constraints 
     WHERE constraint_name = 'users_manager_id_fkey'
   ) THEN
-    ALTER TABLE "users" ADD CONSTRAINT "users_manager_id_fkey" 
-    FOREIGN KEY ("manager_id") REFERENCES "users"("firebase_uid") 
-    ON DELETE SET NULL ON UPDATE CASCADE;
+    -- Check if the primary key column is firebase_uid or firebaseUid
+    IF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'firebase_uid'
+    ) THEN
+      ALTER TABLE "users" ADD CONSTRAINT "users_manager_id_fkey" 
+      FOREIGN KEY ("manager_id") REFERENCES "users"("firebase_uid") 
+      ON DELETE SET NULL ON UPDATE CASCADE;
+    ELSIF EXISTS (
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name = 'users' AND column_name = 'firebaseUid'
+    ) THEN
+      ALTER TABLE "users" ADD CONSTRAINT "users_manager_id_fkey" 
+      FOREIGN KEY ("manager_id") REFERENCES "users"("firebaseUid") 
+      ON DELETE SET NULL ON UPDATE CASCADE;
+    END IF;
   END IF;
 END $$;
 

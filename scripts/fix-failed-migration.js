@@ -13,10 +13,13 @@ async function fixFailedMigration() {
   try {
     console.log('🔧 Checking for failed migrations...');
     
-    // Delete the failed migration record
+    // Delete the failed migration records
     await prisma.$executeRawUnsafe(`
       DELETE FROM "_prisma_migrations" 
-      WHERE migration_name = '20251011_add_employee_hierarchy_stock_and_models'
+      WHERE migration_name IN (
+        '20251011_add_employee_hierarchy_stock_and_models',
+        '20251011060000_cleanup_failed_migration'
+      )
       AND finished_at IS NULL;
     `);
     
