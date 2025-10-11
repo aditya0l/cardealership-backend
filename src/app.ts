@@ -102,6 +102,137 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Create sample bookings for advisor endpoint
+app.post('/api/create-sample-bookings', async (req, res) => {
+  try {
+    console.log('🔧 Creating sample bookings for advisor...');
+    
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Find the advisor user
+    const advisor = await prisma.user.findUnique({
+      where: { email: 'advisor.new@test.com' },
+      select: { firebaseUid: true, employeeId: true, name: true }
+    });
+    
+    if (!advisor) {
+      await prisma.$disconnect();
+      return res.status(404).json({
+        success: false,
+        message: 'Advisor user not found'
+      });
+    }
+    
+    console.log(`Creating bookings for advisor: ${advisor.name} (${advisor.employeeId})`);
+    
+    // Sample booking data
+    const sampleBookings = [
+      {
+        customerName: 'John Smith',
+        customerPhone: '+91-9876543210',
+        customerEmail: 'john.smith@email.com',
+        vehicleModel: 'Tata Nexon',
+        vehicleVariant: 'XZ+',
+        bookingDate: new Date('2025-10-15'),
+        deliveryDate: new Date('2025-10-20'),
+        bookingAmount: 150000,
+        status: 'CONFIRMED',
+        advisorId: advisor.firebaseUid,
+        notes: 'Customer interested in XZ+ variant with sunroof'
+      },
+      {
+        customerName: 'Sarah Johnson',
+        customerPhone: '+91-9876543211',
+        customerEmail: 'sarah.johnson@email.com',
+        vehicleModel: 'Tata Harrier',
+        vehicleVariant: 'XZA+',
+        bookingDate: new Date('2025-10-12'),
+        deliveryDate: new Date('2025-10-18'),
+        bookingAmount: 220000,
+        status: 'PENDING',
+        advisorId: advisor.firebaseUid,
+        notes: 'Customer wants test drive before final confirmation'
+      },
+      {
+        customerName: 'Mike Wilson',
+        customerPhone: '+91-9876543212',
+        customerEmail: 'mike.wilson@email.com',
+        vehicleModel: 'Tata Safari',
+        vehicleVariant: 'XZA+',
+        bookingDate: new Date('2025-10-10'),
+        deliveryDate: new Date('2025-10-25'),
+        bookingAmount: 280000,
+        status: 'CONFIRMED',
+        advisorId: advisor.firebaseUid,
+        notes: 'Family car for weekend trips'
+      },
+      {
+        customerName: 'Emily Brown',
+        customerPhone: '+91-9876543213',
+        customerEmail: 'emily.brown@email.com',
+        vehicleModel: 'Tata Altroz',
+        vehicleVariant: 'XZ+',
+        bookingDate: new Date('2025-10-08'),
+        deliveryDate: new Date('2025-10-16'),
+        bookingAmount: 120000,
+        status: 'DELIVERED',
+        advisorId: advisor.firebaseUid,
+        notes: 'First car purchase for young professional'
+      },
+      {
+        customerName: 'David Lee',
+        customerPhone: '+91-9876543214',
+        customerEmail: 'david.lee@email.com',
+        vehicleModel: 'Tata Punch',
+        vehicleVariant: 'Adventure',
+        bookingDate: new Date('2025-10-05'),
+        deliveryDate: new Date('2025-10-12'),
+        bookingAmount: 95000,
+        status: 'CANCELLED',
+        advisorId: advisor.firebaseUid,
+        notes: 'Customer cancelled due to financial constraints'
+      }
+    ];
+    
+    // Create bookings
+    const createdBookings = [];
+    for (const bookingData of sampleBookings) {
+      try {
+        const booking = await prisma.booking.create({
+          data: bookingData
+        });
+        createdBookings.push(booking);
+        console.log(`✅ Created booking for ${bookingData.customerName}`);
+      } catch (error: any) {
+        console.error(`❌ Error creating booking for ${bookingData.customerName}:`, error.message);
+      }
+    }
+    
+    await prisma.$disconnect();
+    
+    return res.json({
+      success: true,
+      message: `Created ${createdBookings.length} sample bookings for advisor`,
+      advisor: {
+        name: advisor.name,
+        email: 'advisor.new@test.com',
+        employeeId: advisor.employeeId
+      },
+      bookingsCreated: createdBookings.length,
+      totalBookings: createdBookings.length
+    });
+    
+  } catch (error: any) {
+    console.error('Error creating sample bookings:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error creating sample bookings',
+      error: error.message
+    });
+  }
+});
+
 // Assign all bookings to advisor endpoint
 app.post('/api/assign-bookings-to-advisor', async (req, res) => {
   try {
