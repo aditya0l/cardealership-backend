@@ -102,6 +102,61 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug authentication endpoint
+app.get('/api/debug-auth', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (authHeader === 'Bearer test-user') {
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      
+      // Test user lookup
+      let testUser = await prisma.user.findFirst({
+        where: { email: 'advisor.new@test.com' },
+        include: { role: true }
+      });
+      
+      if (!testUser) {
+        testUser = await prisma.user.findFirst({
+          include: { role: true }
+        });
+      }
+      
+      await prisma.$disconnect();
+      
+      if (testUser) {
+        res.json({
+          success: true,
+          message: 'Test user found',
+          user: {
+            email: testUser.email,
+            role: testUser.role.name,
+            employeeId: testUser.employeeId
+          }
+        });
+      } else {
+        res.json({
+          success: false,
+          message: 'No test user found'
+        });
+      }
+    } else {
+      res.json({
+        success: false,
+        message: 'Invalid test-user token',
+        received: authHeader
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Debug auth error',
+      error: error.message
+    });
+  }
+});
+
 // Database schema check endpoint
 app.get('/api/db-schema-check', async (req, res) => {
   try {
