@@ -132,71 +132,61 @@ app.post('/api/create-sample-bookings', async (req, res) => {
         customerName: 'John Smith',
         customerPhone: '+91-9876543210',
         customerEmail: 'john.smith@email.com',
-        vehicleModel: 'Tata Nexon',
-        vehicleVariant: 'XZ+',
+        variant: 'Tata Nexon XZ+',
         bookingDate: new Date('2025-10-15'),
-        deliveryDate: new Date('2025-10-20'),
-        bookingAmount: 150000,
+        expectedDeliveryDate: new Date('2025-10-20'),
         status: BookingStatus.CONFIRMED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
-        notes: 'Customer interested in XZ+ variant with sunroof'
+        remarks: 'Customer interested in XZ+ variant with sunroof'
       },
       {
         customerName: 'Sarah Johnson',
         customerPhone: '+91-9876543211',
         customerEmail: 'sarah.johnson@email.com',
-        vehicleModel: 'Tata Harrier',
-        vehicleVariant: 'XZA+',
+        variant: 'Tata Harrier XZA+',
         bookingDate: new Date('2025-10-12'),
-        deliveryDate: new Date('2025-10-18'),
-        bookingAmount: 220000,
+        expectedDeliveryDate: new Date('2025-10-18'),
         status: BookingStatus.PENDING,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
-        notes: 'Customer wants test drive before final confirmation'
+        remarks: 'Customer wants test drive before final confirmation'
       },
       {
         customerName: 'Mike Wilson',
         customerPhone: '+91-9876543212',
         customerEmail: 'mike.wilson@email.com',
-        vehicleModel: 'Tata Safari',
-        vehicleVariant: 'XZA+',
+        variant: 'Tata Safari XZA+',
         bookingDate: new Date('2025-10-10'),
-        deliveryDate: new Date('2025-10-25'),
-        bookingAmount: 280000,
+        expectedDeliveryDate: new Date('2025-10-25'),
         status: BookingStatus.CONFIRMED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
-        notes: 'Family car for weekend trips'
+        remarks: 'Family car for weekend trips'
       },
       {
         customerName: 'Emily Brown',
         customerPhone: '+91-9876543213',
         customerEmail: 'emily.brown@email.com',
-        vehicleModel: 'Tata Altroz',
-        vehicleVariant: 'XZ+',
+        variant: 'Tata Altroz XZ+',
         bookingDate: new Date('2025-10-08'),
-        deliveryDate: new Date('2025-10-16'),
-        bookingAmount: 120000,
+        expectedDeliveryDate: new Date('2025-10-16'),
         status: BookingStatus.DELIVERED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
-        notes: 'First car purchase for young professional'
+        remarks: 'First car purchase for young professional'
       },
       {
         customerName: 'David Lee',
         customerPhone: '+91-9876543214',
         customerEmail: 'david.lee@email.com',
-        vehicleModel: 'Tata Punch',
-        vehicleVariant: 'Adventure',
+        variant: 'Tata Punch Adventure',
         bookingDate: new Date('2025-10-05'),
-        deliveryDate: new Date('2025-10-12'),
-        bookingAmount: 95000,
+        expectedDeliveryDate: new Date('2025-10-12'),
         status: BookingStatus.CANCELLED,
         advisorId: advisor.firebaseUid,
         dealerCode: 'TATA001',
-        notes: 'Customer cancelled due to financial constraints'
+        remarks: 'Customer cancelled due to financial constraints'
       }
     ];
     
