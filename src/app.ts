@@ -102,6 +102,36 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Firebase status endpoint for debugging
+app.get('/api/firebase-status', async (req, res) => {
+  try {
+    const { auth } = await import('./config/firebase');
+    
+    // Try to list a few users to test Firebase connection
+    const listUsersResult = await auth.listUsers(1);
+    
+    res.json({
+      status: 'ok',
+      message: 'Firebase initialized successfully',
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      userCount: listUsersResult.users.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Firebase initialization failed',
+      error: error.message,
+      firebaseProjectId: process.env.FIREBASE_PROJECT_ID,
+      hasClientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      hasPrivateKey: !!process.env.FIREBASE_PRIVATE_KEY,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiriesRoutes);
