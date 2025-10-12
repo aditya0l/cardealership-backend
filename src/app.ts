@@ -463,6 +463,52 @@ app.post('/api/assign-bookings-to-advisor', async (req, res) => {
   }
 });
 
+// Fix StockAvailability enum specifically
+app.post('/api/fix-stock-enum', async (req, res) => {
+  try {
+    console.log('🔧 Fixing StockAvailability enum...');
+    
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Add StockAvailability enum values
+    try {
+      await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VNA';`;
+      console.log('✅ Added VNA to StockAvailability');
+    } catch (error: any) {
+      console.log('ℹ️ VNA might already exist:', error.message);
+    }
+    
+    try {
+      await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VEHICLE_AVAILABLE';`;
+      console.log('✅ Added VEHICLE_AVAILABLE to StockAvailability');
+    } catch (error: any) {
+      console.log('ℹ️ VEHICLE_AVAILABLE might already exist:', error.message);
+    }
+    
+    // Check current StockAvailability enum values
+    const stockAvailability = await prisma.$queryRaw`
+      SELECT unnest(enum_range(NULL::"StockAvailability")) as availability;
+    `;
+    
+    await prisma.$disconnect();
+    
+    res.json({
+      success: true,
+      message: 'StockAvailability enum fixed successfully',
+      stockAvailability: stockAvailability
+    });
+    
+  } catch (error: any) {
+    console.error('Error fixing StockAvailability enum:', error.message);
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing StockAvailability enum',
+      error: error.message
+    });
+  }
+});
+
 // Fix database enums endpoint
 app.post('/api/fix-enums', async (req, res) => {
   try {
