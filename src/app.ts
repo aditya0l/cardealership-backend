@@ -471,12 +471,16 @@ app.post('/api/fix-enums', async (req, res) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
     
-             // Add missing enum values
+             // Add missing enum values for EnquiryCategory
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'HOT';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'WARM';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'COLD';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'BOOKED';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'LOST';`;
+             
+             // Add missing enum values for StockAvailability
+             await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VNA';`;
+             await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VEHICLE_AVAILABLE';`;
              
              // Try to add LOST with a different approach
              try {
@@ -495,12 +499,17 @@ app.post('/api/fix-enums', async (req, res) => {
       SELECT unnest(enum_range(NULL::"EnquiryCategory")) as category;
     `;
     
+    const stockAvailability = await prisma.$queryRaw`
+      SELECT unnest(enum_range(NULL::"StockAvailability")) as availability;
+    `;
+    
     await prisma.$disconnect();
     
     res.json({
       success: true,
       message: 'Enums fixed successfully',
-      categories: categories
+      categories: categories,
+      stockAvailability: stockAvailability
     });
     
   } catch (error: any) {
