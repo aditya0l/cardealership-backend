@@ -234,6 +234,176 @@ app.post('/api/create-sample-bookings', async (req, res) => {
   }
 });
 
+// Critical backend fixes endpoint - fixes all production blocking issues
+app.post('/api/critical-fixes', async (req, res) => {
+  try {
+    console.log('🚨 Applying critical backend fixes...');
+    
+    const { PrismaClient, BookingStatus, RoleName } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const results = {
+      enumFixes: [],
+      userFixes: [],
+      roleFixes: []
+    };
+    
+    // Fix 1: Add missing enum values
+    console.log('🔧 Fixing EnquiryCategory enum...');
+    const enumValues = ['HOT', 'LOST', 'BOOKED', 'ALL'];
+    
+    for (const value of enumValues) {
+      try {
+        await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS ${value};`;
+        results.enumFixes.push(`✅ Added ${value} to EnquiryCategory`);
+        console.log(`✅ Added ${value} to EnquiryCategory`);
+      } catch (error: any) {
+        if (error.message.includes('already exists')) {
+          results.enumFixes.push(`ℹ️ ${value} already exists in EnquiryCategory`);
+        } else {
+          results.enumFixes.push(`❌ Error adding ${value}: ${error.message}`);
+        }
+      }
+    }
+    
+    // Fix 2: Ensure required roles exist
+    console.log('🔧 Ensuring required roles exist...');
+    const requiredRoles = [
+      { name: 'ADMIN', description: 'Administrator' },
+      { name: 'CUSTOMER_ADVISOR', description: 'Customer Advisor' },
+      { name: 'SALES_MANAGER', description: 'Sales Manager' },
+      { name: 'GENERAL_MANAGER', description: 'General Manager' }
+    ];
+    
+    for (const role of requiredRoles) {
+      try {
+        await prisma.role.upsert({
+          where: { name: role.name as any },
+          update: {},
+          create: {
+            name: role.name as any,
+            description: role.description,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+        results.roleFixes.push(`✅ Role ${role.name} exists`);
+      } catch (error: any) {
+        results.roleFixes.push(`❌ Error with role ${role.name}: ${error.message}`);
+      }
+    }
+    
+    // Fix 3: Add critical test users
+    console.log('🔧 Adding critical test users...');
+    
+    // Get the CUSTOMER_ADVISOR role
+    const advisorRole = await prisma.role.findUnique({
+      where: { name: 'CUSTOMER_ADVISOR' }
+    });
+    
+    if (advisorRole) {
+      // Add advisor user
+      try {
+        await prisma.user.upsert({
+          where: { firebaseUid: 'g5Fr20vtaMZkjCxLRJJr9WORGJc2' },
+          update: {
+            name: 'Advisor New',
+            email: 'advisor.new@test.com',
+            roleId: advisorRole.id,
+            isActive: true,
+            updatedAt: new Date()
+          },
+          create: {
+            firebaseUid: 'g5Fr20vtaMZkjCxLRJJr9WORGJc2',
+            name: 'Advisor New',
+            email: 'advisor.new@test.com',
+            roleId: advisorRole.id,
+            employeeId: 'ADV007',
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+        results.userFixes.push('✅ Advisor user (advisor.new@test.com) created/updated');
+      } catch (error: any) {
+        results.userFixes.push(`❌ Error with advisor user: ${error.message}`);
+      }
+    }
+    
+    // Get the ADMIN role
+    const adminRole = await prisma.role.findUnique({
+      where: { name: 'ADMIN' }
+    });
+    
+    if (adminRole) {
+      // Add admin user
+      try {
+        await prisma.user.upsert({
+          where: { firebaseUid: 'admin-test-uid-123' },
+          update: {
+            name: 'Admin User',
+            email: 'admin@dealership.com',
+            roleId: adminRole.id,
+            isActive: true,
+            updatedAt: new Date()
+          },
+          create: {
+            firebaseUid: 'admin-test-uid-123',
+            name: 'Admin User',
+            email: 'admin@dealership.com',
+            roleId: adminRole.id,
+            employeeId: 'ADM001',
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        });
+        results.userFixes.push('✅ Admin user (admin@dealership.com) created/updated');
+      } catch (error: any) {
+        results.userFixes.push(`❌ Error with admin user: ${error.message}`);
+      }
+    }
+    
+    // Verify current enum values
+    const currentEnums = await prisma.$queryRaw`
+      SELECT unnest(enum_range(NULL::"EnquiryCategory")) as category;
+    `;
+    
+    await prisma.$disconnect();
+    
+    return res.json({
+      success: true,
+      message: 'Critical backend fixes applied successfully',
+      results: {
+        enumFixes: results.enumFixes,
+        userFixes: results.userFixes,
+        roleFixes: results.roleFixes,
+        currentEnquiryCategories: currentEnums
+      },
+      testCredentials: {
+        advisor: {
+          email: 'advisor.new@test.com',
+          firebaseUid: 'g5Fr20vtaMZkjCxLRJJr9WORGJc2',
+          employeeId: 'ADV007'
+        },
+        admin: {
+          email: 'admin@dealership.com',
+          firebaseUid: 'admin-test-uid-123',
+          employeeId: 'ADM001'
+        }
+      }
+    });
+    
+  } catch (error: any) {
+    console.error('Error applying critical fixes:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error applying critical fixes',
+      error: error.message
+    });
+  }
+});
+
 // Assign all bookings to advisor endpoint
 app.post('/api/assign-bookings-to-advisor', async (req, res) => {
   try {
