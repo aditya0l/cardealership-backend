@@ -843,12 +843,33 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
       }
     }
 
-    // Validate boolean fields
-    if (updateData.financeRequired !== undefined && typeof updateData.financeRequired !== 'boolean') {
-      throw createError('financeRequired must be a boolean', 400);
+    // Convert and validate boolean fields (handle string booleans from mobile apps)
+    if (updateData.financeRequired !== undefined) {
+      if (typeof updateData.financeRequired === 'string') {
+        if (updateData.financeRequired.toLowerCase() === 'true') {
+          updateData.financeRequired = true;
+        } else if (updateData.financeRequired.toLowerCase() === 'false') {
+          updateData.financeRequired = false;
+        } else {
+          throw createError('financeRequired must be a boolean (true/false)', 400);
+        }
+      } else if (typeof updateData.financeRequired !== 'boolean') {
+        throw createError('financeRequired must be a boolean', 400);
+      }
     }
-    if (updateData.backOrderStatus !== undefined && typeof updateData.backOrderStatus !== 'boolean') {
-      throw createError('backOrderStatus must be a boolean', 400);
+    
+    if (updateData.backOrderStatus !== undefined) {
+      if (typeof updateData.backOrderStatus === 'string') {
+        if (updateData.backOrderStatus.toLowerCase() === 'true') {
+          updateData.backOrderStatus = true;
+        } else if (updateData.backOrderStatus.toLowerCase() === 'false') {
+          updateData.backOrderStatus = false;
+        } else {
+          throw createError('backOrderStatus must be a boolean (true/false)', 400);
+        }
+      } else if (typeof updateData.backOrderStatus !== 'boolean') {
+        throw createError('backOrderStatus must be a boolean', 400);
+      }
     }
 
     // Validate date fields (convert to Date objects if they're strings)
