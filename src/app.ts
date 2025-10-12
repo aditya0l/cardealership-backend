@@ -12,7 +12,7 @@ import quotationsRoutes from './routes/quotations.routes';
 import stockRoutes from './routes/stock.routes'; // Updated to use Vehicle model with RBAC
 import dashboardRoutes from './routes/dashboard.routes';
 import modelRoutes from './routes/model.routes';
-import adminRoutes from './routes/admin.routes';
+// import adminRoutes from './routes/admin.routes'; // Temporarily disabled - requires schema migration
 
 // Import middleware
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
@@ -828,7 +828,7 @@ app.get('/api/debug-user-role/:email', async (req, res) => {
       });
     }
     
-    res.json({
+    return res.json({
       success: true,
       data: {
         email: user.email,
@@ -854,7 +854,7 @@ app.get('/api/debug-user-role/:email', async (req, res) => {
       }
     });
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error fetching user',
       error: error.message
@@ -890,7 +890,7 @@ app.post('/api/fix-admin-role', async (req, res) => {
     
     await prisma.$disconnect();
     
-    res.json({
+    return res.json({
       success: true,
       message: 'Admin role fixed successfully',
       data: {
@@ -902,7 +902,7 @@ app.post('/api/fix-admin-role', async (req, res) => {
       }
     });
   } catch (error: any) {
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error fixing admin role',
       error: error.message
@@ -918,7 +918,7 @@ app.use('/api/quotations', quotationsRoutes); // Re-enabled with RBAC
 app.use('/api/stock', stockRoutes); // Re-enabled with Vehicle model and RBAC
 app.use('/api/models', modelRoutes); // Model master data management
 app.use('/api/dashboard', dashboardRoutes); // Dashboard analytics endpoints
-app.use('/api/admin', adminRoutes); // Admin management system for dealership configuration
+// app.use('/api/admin', adminRoutes); // Temporarily disabled - requires schema migration
 
 // Catch 404 and forward to error handler
 app.use(notFoundHandler);
