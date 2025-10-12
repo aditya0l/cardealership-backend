@@ -806,6 +806,62 @@ app.get('/api/firebase-status', async (req, res) => {
   }
 });
 
+// Debug endpoint to check user role
+app.get('/api/debug-user-role/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { role: true }
+    });
+    
+    await prisma.$disconnect();
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+        email
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        email: user.email,
+        name: user.name,
+        firebaseUid: user.firebaseUid,
+        employeeId: user.employeeId,
+        role: {
+          id: user.role.id,
+          name: user.role.name
+        },
+        isActive: user.isActive,
+        whatLoginReturns: {
+          user: {
+            firebaseUid: user.firebaseUid,
+            email: user.email,
+            name: user.name,
+            role: {
+              id: user.role.id,
+              name: user.role.name
+            }
+          }
+        }
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching user',
+      error: error.message
+    });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiriesRoutes);
