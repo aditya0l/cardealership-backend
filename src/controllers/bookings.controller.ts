@@ -844,32 +844,44 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
     }
 
     // Convert and validate boolean fields (handle string booleans from mobile apps)
-    if (updateData.financeRequired !== undefined) {
+    if (updateData.financeRequired !== undefined && updateData.financeRequired !== null) {
       if (typeof updateData.financeRequired === 'string') {
-        if (updateData.financeRequired.toLowerCase() === 'true') {
+        const value = updateData.financeRequired.trim().toLowerCase();
+        if (value === 'true' || value === '1') {
           updateData.financeRequired = true;
-        } else if (updateData.financeRequired.toLowerCase() === 'false') {
+        } else if (value === 'false' || value === '0' || value === '') {
           updateData.financeRequired = false;
         } else {
-          throw createError('financeRequired must be a boolean (true/false)', 400);
+          console.error(`Invalid financeRequired value: "${updateData.financeRequired}" (type: ${typeof updateData.financeRequired})`);
+          throw createError(`financeRequired must be a boolean (received: "${updateData.financeRequired}")`, 400);
         }
       } else if (typeof updateData.financeRequired !== 'boolean') {
-        throw createError('financeRequired must be a boolean', 400);
+        console.error(`Invalid financeRequired type: ${typeof updateData.financeRequired}, value: ${updateData.financeRequired}`);
+        throw createError(`financeRequired must be a boolean (received type: ${typeof updateData.financeRequired})`, 400);
       }
+    } else if (updateData.financeRequired === null || updateData.financeRequired === '') {
+      // Handle null or empty string as undefined (don't update the field)
+      delete updateData.financeRequired;
     }
     
-    if (updateData.backOrderStatus !== undefined) {
+    if (updateData.backOrderStatus !== undefined && updateData.backOrderStatus !== null) {
       if (typeof updateData.backOrderStatus === 'string') {
-        if (updateData.backOrderStatus.toLowerCase() === 'true') {
+        const value = updateData.backOrderStatus.trim().toLowerCase();
+        if (value === 'true' || value === '1') {
           updateData.backOrderStatus = true;
-        } else if (updateData.backOrderStatus.toLowerCase() === 'false') {
+        } else if (value === 'false' || value === '0' || value === '') {
           updateData.backOrderStatus = false;
         } else {
-          throw createError('backOrderStatus must be a boolean (true/false)', 400);
+          console.error(`Invalid backOrderStatus value: "${updateData.backOrderStatus}" (type: ${typeof updateData.backOrderStatus})`);
+          throw createError(`backOrderStatus must be a boolean (received: "${updateData.backOrderStatus}")`, 400);
         }
       } else if (typeof updateData.backOrderStatus !== 'boolean') {
-        throw createError('backOrderStatus must be a boolean', 400);
+        console.error(`Invalid backOrderStatus type: ${typeof updateData.backOrderStatus}, value: ${updateData.backOrderStatus}`);
+        throw createError(`backOrderStatus must be a boolean (received type: ${typeof updateData.backOrderStatus})`, 400);
       }
+    } else if (updateData.backOrderStatus === null || updateData.backOrderStatus === '') {
+      // Handle null or empty string as undefined (don't update the field)
+      delete updateData.backOrderStatus;
     }
 
     // Validate date fields (convert to Date objects if they're strings)
