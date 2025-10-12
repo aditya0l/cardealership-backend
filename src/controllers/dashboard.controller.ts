@@ -260,8 +260,11 @@ export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, 
     ]);
 
     // Process enquiry stats
-    const enquiryByCategory = {
+    const enquiryByCategory: Record<string, number> = {
+      ALL: 0,
       HOT: 0,
+      WARM: 0,
+      COLD: 0,
       LOST: 0,
       BOOKED: 0
     };
