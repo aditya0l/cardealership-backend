@@ -656,6 +656,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         'tl@cardealership.com': 'TeamLead123!',
         'advisor@cardealership.com': 'Advisor123!',
         'admin.new@test.com': 'testpassword123',
+        'admin@dealership.com': 'testpassword123',
         'advisor.new@test.com': 'testpassword123'
       };
 
