@@ -4,7 +4,8 @@ import {
   getVehicles,
   getVehicleById,
   updateVehicle,
-  deleteVehicle
+  deleteVehicle,
+  getStockStats
 } from '../controllers/stock.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
@@ -13,6 +14,9 @@ const router = Router();
 
 // All routes require authentication
 router.use(authenticate);
+
+// Get stock statistics - All authenticated users can view
+router.get('/stats', getStockStats);
 
 // Create vehicle - General Manager, Sales Manager, Admin only
 router.post('/', authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), createVehicle);
