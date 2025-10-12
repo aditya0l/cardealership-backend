@@ -46,7 +46,8 @@ export const getDealerships = asyncHandler(async (req: AuthenticatedRequest, res
   const user = req.user;
 
   // Only admins and general managers can view all dealerships
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -169,7 +170,8 @@ export const createVehicleModel = asyncHandler(async (req: AuthenticatedRequest,
   const user = req.user;
 
   // Only admins and general managers can create vehicle models
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -234,7 +236,8 @@ export const updateVehicleModel = asyncHandler(async (req: AuthenticatedRequest,
   const user = req.user;
 
   // Only admins and general managers can update vehicle models
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -287,7 +290,8 @@ export const createVehicleVariant = asyncHandler(async (req: AuthenticatedReques
   const user = req.user;
 
   // Only admins and general managers can create variants
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -377,7 +381,8 @@ export const updateVehicleVariant = asyncHandler(async (req: AuthenticatedReques
   const user = req.user;
 
   // Only admins and general managers can update variants
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -445,7 +450,8 @@ export const createVehicleColor = asyncHandler(async (req: AuthenticatedRequest,
   const user = req.user;
 
   // Only admins and general managers can create colors
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -521,7 +527,8 @@ export const updateVehicleColor = asyncHandler(async (req: AuthenticatedRequest,
   const user = req.user;
 
   // Only admins and general managers can update colors
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
@@ -806,7 +813,8 @@ export const assignUserRole = asyncHandler(async (req: AuthenticatedRequest, res
   const user = req.user;
 
   // Only admins and general managers can assign roles
-  if (![RoleName.ADMIN, RoleName.GENERAL_MANAGER].includes(user.role.name)) {
+  const allowedRoles: RoleName[] = [RoleName.ADMIN, RoleName.GENERAL_MANAGER];
+  if (!allowedRoles.includes(user.role.name)) {
     throw createError('Insufficient permissions', 403);
   }
 
