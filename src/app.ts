@@ -862,6 +862,54 @@ app.get('/api/debug-user-role/:email', async (req, res) => {
   }
 });
 
+// Force fix admin role endpoint
+app.post('/api/fix-admin-role', async (req, res) => {
+  try {
+    const { PrismaClient, RoleName } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    // Get ADMIN role
+    const adminRole = await prisma.role.findUnique({
+      where: { name: RoleName.ADMIN }
+    });
+    
+    if (!adminRole) {
+      await prisma.$disconnect();
+      return res.status(404).json({
+        success: false,
+        message: 'ADMIN role not found in database'
+      });
+    }
+    
+    // Update admin.new@test.com to ADMIN role
+    const updatedUser = await prisma.user.update({
+      where: { email: 'admin.new@test.com' },
+      data: { roleId: adminRole.id },
+      include: { role: true }
+    });
+    
+    await prisma.$disconnect();
+    
+    res.json({
+      success: true,
+      message: 'Admin role fixed successfully',
+      data: {
+        email: updatedUser.email,
+        name: updatedUser.name,
+        roleBeforeFix: '(unknown)',
+        roleAfterFix: updatedUser.role.name,
+        firebaseUid: updatedUser.firebaseUid
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      message: 'Error fixing admin role',
+      error: error.message
+    });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/enquiries', enquiriesRoutes);
