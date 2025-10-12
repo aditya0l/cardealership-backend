@@ -276,7 +276,10 @@ enum EnquiryStatus {
 }
 
 enum EnquiryCategory {
+  ALL     // All enquiries (filter option)
   HOT     // High priority, likely to convert
+  WARM    // Moderate interest
+  COLD    // Low interest
   LOST    // Customer lost/not interested
   BOOKED  // Converted to booking
 }

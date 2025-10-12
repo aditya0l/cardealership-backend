@@ -250,7 +250,7 @@ app.post('/api/critical-fixes', async (req, res) => {
     
     // Fix 1: Add missing enum values
     console.log('🔧 Fixing EnquiryCategory enum...');
-    const enumValues = ['HOT', 'LOST', 'BOOKED', 'ALL'];
+    const enumValues = ['ALL', 'HOT', 'WARM', 'COLD', 'LOST', 'BOOKED'];
     
     for (const value of enumValues) {
       try {
@@ -518,27 +518,20 @@ app.post('/api/fix-enums', async (req, res) => {
     const prisma = new PrismaClient();
     
              // Add missing enum values for EnquiryCategory
+             await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'ALL';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'HOT';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'WARM';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'COLD';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'BOOKED';`;
              await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE IF NOT EXISTS 'LOST';`;
              
+             console.log('✅ Added all EnquiryCategory enum values');
+             
              // Add missing enum values for StockAvailability
              await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VNA';`;
              await prisma.$executeRaw`ALTER TYPE "StockAvailability" ADD VALUE IF NOT EXISTS 'VEHICLE_AVAILABLE';`;
              
-             // Try to add LOST with a different approach
-             try {
-               await prisma.$executeRaw`ALTER TYPE "EnquiryCategory" ADD VALUE 'LOST';`;
-               console.log('✅ Added LOST enum value');
-             } catch (error: any) {
-               if (error.message.includes('already exists')) {
-                 console.log('ℹ️ LOST enum value already exists');
-               } else {
-                 console.log('❌ Error adding LOST:', error.message);
-               }
-             }
+             console.log('✅ Added all StockAvailability enum values');
     
     // Check current enum values
     const categories = await prisma.$queryRaw`
