@@ -355,13 +355,13 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
   let booking = null;
   let stockInfo = null;
   if (category === EnquiryCategory.BOOKED) {
-    // ✅ STOCK VALIDATION - Check if vehicle is in stock (quantity > 0)
+    // ✅ NO STOCK VALIDATION - Allow conversion regardless of stock status
+    // Stock status is provided as informational badge only
     if (enquiry.variant) {
-      const vehicleInStock = await prisma.vehicle.findFirst({
+      const vehicleInfo = await prisma.vehicle.findFirst({
         where: {
           variant: enquiry.variant,
-          isActive: true,
-          totalStock: { gt: 0 } // Check total stock quantity > 0
+          isActive: true
         },
         select: {
           id: true,
@@ -376,14 +376,8 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
         }
       });
 
-      if (!vehicleInStock) {
-        throw createError(
-          `Vehicle variant "${enquiry.variant}" is not in stock. Cannot convert to booking. Please check stock availability or create with back-order status.`,
-          400
-        );
-      }
-
-      stockInfo = vehicleInStock;
+      // Use vehicle info if found, but don't block if not found or out of stock
+      stockInfo = vehicleInfo;
     }
 
     // Check if booking already exists for this enquiry
@@ -410,9 +404,9 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
           status: 'PENDING',
           bookingDate: new Date(),
           expectedDeliveryDate: enquiry.expectedBookingDate,
-          stockAvailability: stockInfo ? 'VEHICLE_AVAILABLE' : undefined,  // Set stock status
-          backOrderStatus: false,  // Not a back order since stock is available
-          remarks: `Auto-created from enquiry: ${enquiry.id}. ${enquiry.caRemarks || ''}${stockInfo ? '\nStock validated: Vehicle available in inventory.' : ''}`
+          stockAvailability: stockInfo && stockInfo.totalStock > 0 ? 'VEHICLE_AVAILABLE' : 'VNA',  // Informational only
+          backOrderStatus: !stockInfo || stockInfo.totalStock === 0,  // Set based on stock info
+          remarks: `Auto-created from enquiry: ${enquiry.id}. ${enquiry.caRemarks || ''}${stockInfo ? `\nStock info: ${stockInfo.totalStock || 0} units available.` : '\nStock info: Not available in system.'}`
         },
         include: {
           enquiry: {

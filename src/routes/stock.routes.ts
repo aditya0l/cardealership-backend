@@ -5,7 +5,8 @@ import {
   getVehicleById,
   updateVehicle,
   deleteVehicle,
-  getStockStats
+  getStockStats,
+  getStockStatusByVariant
 } from '../controllers/stock.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
@@ -17,6 +18,9 @@ router.use(authenticate);
 
 // Get stock statistics - All authenticated users can view
 router.get('/stats', getStockStats);
+
+// Get stock status for a specific variant (informational badge) - All authenticated users can view
+router.get('/status/:variantCode', getStockStatusByVariant);
 
 // Create vehicle - General Manager, Sales Manager, Admin only
 router.post('/', authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), createVehicle);

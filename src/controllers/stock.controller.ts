@@ -4,6 +4,7 @@ import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { canPerformAction } from '../middlewares/rbac.middleware';
 import { RoleName } from '@prisma/client';
+import { stockService } from '../services/stock.service';
 
 interface CreateVehicleRequest {
   variant: string;
@@ -331,5 +332,21 @@ export const getStockStats = asyncHandler(async (req: AuthenticatedRequest, res:
         totalStock: item._sum.totalStock || 0
       }))
     }
+  });
+});
+
+export const getStockStatusByVariant = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { variantCode } = req.params;
+
+  if (!variantCode) {
+    throw createError('Variant code is required', 400);
+  }
+
+  // Get stock status (informational only - does not block any operations)
+  const stockStatus = await stockService.getStockStatus(variantCode);
+
+  res.json({
+    success: true,
+    data: stockStatus
   });
 });
