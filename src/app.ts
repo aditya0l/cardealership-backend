@@ -243,9 +243,9 @@ app.post('/api/critical-fixes', async (req, res) => {
     const prisma = new PrismaClient();
     
     const results = {
-      enumFixes: [],
-      userFixes: [],
-      roleFixes: []
+      enumFixes: [] as string[],
+      userFixes: [] as string[],
+      roleFixes: [] as string[]
     };
     
     // Fix 1: Add missing enum values
@@ -269,27 +269,24 @@ app.post('/api/critical-fixes', async (req, res) => {
     // Fix 2: Ensure required roles exist
     console.log('🔧 Ensuring required roles exist...');
     const requiredRoles = [
-      { name: 'ADMIN', description: 'Administrator' },
-      { name: 'CUSTOMER_ADVISOR', description: 'Customer Advisor' },
-      { name: 'SALES_MANAGER', description: 'Sales Manager' },
-      { name: 'GENERAL_MANAGER', description: 'General Manager' }
+      'ADMIN',
+      'CUSTOMER_ADVISOR', 
+      'SALES_MANAGER',
+      'GENERAL_MANAGER'
     ];
     
-    for (const role of requiredRoles) {
+    for (const roleName of requiredRoles) {
       try {
         await prisma.role.upsert({
-          where: { name: role.name as any },
+          where: { name: roleName as any },
           update: {},
           create: {
-            name: role.name as any,
-            description: role.description,
-            createdAt: new Date(),
-            updatedAt: new Date()
+            name: roleName as any
           }
         });
-        results.roleFixes.push(`✅ Role ${role.name} exists`);
+        results.roleFixes.push(`✅ Role ${roleName} exists`);
       } catch (error: any) {
-        results.roleFixes.push(`❌ Error with role ${role.name}: ${error.message}`);
+        results.roleFixes.push(`❌ Error with role ${roleName}: ${error.message}`);
       }
     }
     
