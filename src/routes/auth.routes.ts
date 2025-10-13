@@ -11,7 +11,8 @@ import {
   getAllUsers,
   getUsersByRole,
   assignManager,
-  login
+  login,
+  syncFirebaseUsers
 } from '../controllers/auth.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
@@ -35,5 +36,8 @@ router.put('/users/:firebaseUid/manager', authenticate, authorize([RoleName.ADMI
 router.put('/users/:firebaseUid/password', authenticate, authorize([RoleName.ADMIN]), resetUserPassword); // Reset user password
 router.put('/users/:firebaseUid/deactivate', authenticate, authorize([RoleName.ADMIN]), deactivateUser); // Deactivate user
 router.put('/users/:firebaseUid/activate', authenticate, authorize([RoleName.ADMIN]), activateUser); // Activate user
+
+// Firebase sync route - Admin only
+router.post('/sync-firebase-users', authenticate, authorize([RoleName.ADMIN]), syncFirebaseUsers); // Sync all Firebase users to database
 
 export default router;

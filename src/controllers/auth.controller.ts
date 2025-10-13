@@ -656,7 +656,6 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
         'tl@cardealership.com': 'TeamLead123!',
         'advisor@cardealership.com': 'Advisor123!',
         'admin.new@test.com': 'testpassword123',
-        'admin@dealership.com': 'testpassword123',
         'advisor.new@test.com': 'testpassword123'
       };
 
@@ -701,5 +700,111 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
     }
     console.error('Login error:', error);
     throw createError('Login failed. Please try again.', 500);
+  }
+});
+
+// Sync Firebase users to database (Admin only)
+export const syncFirebaseUsers = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    console.log('🔄 Starting Firebase users sync...');
+    
+    const results = {
+      created: [] as string[],
+      updated: [] as string[],
+      skipped: [] as string[],
+      errors: [] as { email: string; error: string }[]
+    };
+
+    // Get all users from Firebase
+    const listUsersResult = await auth.listUsers(1000); // Max 1000 users
+    console.log(`📋 Found ${listUsersResult.users.length} users in Firebase`);
+
+    for (const firebaseUser of listUsersResult.users) {
+      try {
+        const { uid, email, displayName } = firebaseUser;
+        
+        if (!email) {
+          results.skipped.push(uid);
+          continue;
+        }
+
+        // Check if user exists in database
+        const existingUser = await prisma.user.findUnique({
+          where: { firebaseUid: uid },
+          include: { role: true }
+        });
+
+        // Determine role from custom claims or default to ADMIN
+        let roleName: RoleName = RoleName.ADMIN;
+        if (firebaseUser.customClaims?.role) {
+          roleName = firebaseUser.customClaims.role as RoleName;
+        }
+
+        const role = await prisma.role.findFirst({
+          where: { name: roleName }
+        });
+
+        if (!role) {
+          results.errors.push({ 
+            email, 
+            error: `Role ${roleName} not found in database` 
+          });
+          continue;
+        }
+
+        if (existingUser) {
+          // Update existing user
+          await prisma.user.update({
+            where: { firebaseUid: uid },
+            data: {
+              email,
+              name: displayName || existingUser.name,
+              roleId: role.id
+            }
+          });
+          results.updated.push(email);
+          console.log(`✅ Updated user: ${email}`);
+        } else {
+          // Create new user
+          await prisma.user.create({
+            data: {
+              firebaseUid: uid,
+              email,
+              name: displayName || email.split('@')[0],
+              roleId: role.id,
+              isActive: true
+            }
+          });
+          results.created.push(email);
+          console.log(`✅ Created user: ${email}`);
+        }
+      } catch (userError) {
+        const errorMessage = userError instanceof Error ? userError.message : 'Unknown error';
+        results.errors.push({ 
+          email: firebaseUser.email || firebaseUser.uid, 
+          error: errorMessage 
+        });
+        console.error(`❌ Error syncing user ${firebaseUser.email}:`, errorMessage);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Firebase users sync completed',
+      data: {
+        summary: {
+          total: listUsersResult.users.length,
+          created: results.created.length,
+          updated: results.updated.length,
+          skipped: results.skipped.length,
+          errors: results.errors.length
+        },
+        results
+      }
+    });
+
+  } catch (error) {
+    console.error('Firebase sync error:', error);
+    throw createError('Failed to sync Firebase users', 500);
   }
 });

@@ -260,11 +260,8 @@ export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, 
     ]);
 
     // Process enquiry stats
-    const enquiryByCategory: Record<string, number> = {
-      ALL: 0,
+    const enquiryByCategory = {
       HOT: 0,
-      WARM: 0,
-      COLD: 0,
       LOST: 0,
       BOOKED: 0
     };
@@ -275,8 +272,8 @@ export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, 
     };
 
     enquiryStats.forEach(stat => {
-      if (stat.category) {
-        enquiryByCategory[stat.category] = (enquiryByCategory[stat.category] || 0) + stat._count;
+      if (stat.category && stat.category in enquiryByCategory) {
+        enquiryByCategory[stat.category as keyof typeof enquiryByCategory] = (enquiryByCategory[stat.category as keyof typeof enquiryByCategory] || 0) + stat._count;
       }
       if (stat.status === 'OPEN') {
         enquiryByStatus.OPEN += stat._count;
