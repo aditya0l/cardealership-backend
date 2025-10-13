@@ -12,6 +12,7 @@ import quotationsRoutes from './routes/quotations.routes';
 import stockRoutes from './routes/stock.routes'; // Updated to use Vehicle model with RBAC
 import dashboardRoutes from './routes/dashboard.routes';
 import modelRoutes from './routes/model.routes';
+import dealershipRoutes from './routes/dealership.routes'; // Multi-dealership system
 // import adminRoutes from './routes/admin.routes'; // Temporarily disabled - requires schema migration
 
 // Import middleware
@@ -912,6 +913,7 @@ app.post('/api/fix-admin-role', async (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/dealerships', dealershipRoutes); // Multi-dealership management
 app.use('/api/enquiries', enquiriesRoutes);
 app.use('/api/bookings', bookingsRoutes);
 app.use('/api/quotations', quotationsRoutes); // Re-enabled with RBAC

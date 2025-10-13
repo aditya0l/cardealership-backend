@@ -11,6 +11,7 @@ export interface AuthenticatedUser {
     id: string;
     name: RoleName;
   };
+  dealershipId?: string | null; // Multi-dealership support
   customClaims?: Record<string, any>;
 }
 
@@ -85,7 +86,8 @@ export const authenticate = async (
           role: {
             id: testUser.role.id,
             name: testUser.role.name
-          }
+          },
+          dealershipId: testUser.dealershipId
         };
         next();
         return;
@@ -180,6 +182,7 @@ export const authenticate = async (
         id: user.role.id,
         name: user.role.name
       },
+      dealershipId: user.dealershipId,
       customClaims: decodedToken.customClaims || {}
     };
 
