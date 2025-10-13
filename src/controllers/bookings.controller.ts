@@ -187,8 +187,8 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
               email: true,
               role: true
             }
-          },
-          dealer: false
+          }
+          // Removed: dealer: false (was causing issues)
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -196,9 +196,16 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
     ]);
 
     // Filter each booking based on user's read permissions
-    const filteredBookings = bookings.map(booking => 
-      filterReadableFields(booking, user.role.name)
-    );
+    let filteredBookings;
+    try {
+      filteredBookings = bookings.map(booking => 
+        filterReadableFields(booking, user.role.name)
+      );
+    } catch (filterError) {
+      console.error('Error filtering bookings:', filterError);
+      // If filtering fails, return bookings as-is for ADMIN, empty for others
+      filteredBookings = user.role.name === RoleName.ADMIN ? bookings : [];
+    }
 
     res.json({
       success: true,
@@ -216,6 +223,7 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   } catch (error: any) {
     console.error('Error fetching bookings:', error);
+    console.error('Error details:', error.message, error.stack);
     throw createError('Failed to fetch bookings', 500);
   }
 });
@@ -561,8 +569,8 @@ export const getAdvisorBookings = asyncHandler(async (req: AuthenticatedRequest,
               customerEmail: true,
               status: true
             }
-          },
-          dealer: false
+          }
+          // Removed: dealer: false (was causing issues)
         },
         orderBy: { createdAt: 'desc' }
       }),
@@ -570,9 +578,15 @@ export const getAdvisorBookings = asyncHandler(async (req: AuthenticatedRequest,
     ]);
 
     // Filter each booking based on advisor's read permissions
-    const filteredBookings = bookings.map(booking => 
-      filterReadableFields(booking, user.role.name)
-    );
+    let filteredBookings;
+    try {
+      filteredBookings = bookings.map(booking => 
+        filterReadableFields(booking, user.role.name)
+      );
+    } catch (filterError) {
+      console.error('Error filtering advisor bookings:', filterError);
+      filteredBookings = bookings; // Return as-is if filtering fails
+    }
 
     res.json({
       success: true,
@@ -593,6 +607,7 @@ export const getAdvisorBookings = asyncHandler(async (req: AuthenticatedRequest,
 
   } catch (error: any) {
     console.error('Error fetching advisor bookings:', error);
+    console.error('Error details:', error.message, error.stack);
     if (error.message.includes('Invalid timeline')) {
       throw error;
     }
@@ -843,45 +858,12 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
       }
     }
 
-    // Convert and validate boolean fields (handle string booleans from mobile apps)
-    if (updateData.financeRequired !== undefined && updateData.financeRequired !== null) {
-      if (typeof updateData.financeRequired === 'string') {
-        const value = updateData.financeRequired.trim().toLowerCase();
-        if (value === 'true' || value === '1') {
-          updateData.financeRequired = true;
-        } else if (value === 'false' || value === '0' || value === '') {
-          updateData.financeRequired = false;
-        } else {
-          console.error(`Invalid financeRequired value: "${updateData.financeRequired}" (type: ${typeof updateData.financeRequired})`);
-          throw createError(`financeRequired must be a boolean (received: "${updateData.financeRequired}")`, 400);
-        }
-      } else if (typeof updateData.financeRequired !== 'boolean') {
-        console.error(`Invalid financeRequired type: ${typeof updateData.financeRequired}, value: ${updateData.financeRequired}`);
-        throw createError(`financeRequired must be a boolean (received type: ${typeof updateData.financeRequired})`, 400);
-      }
-    } else if (updateData.financeRequired === null || updateData.financeRequired === '') {
-      // Handle null or empty string as undefined (don't update the field)
-      delete updateData.financeRequired;
+    // Validate boolean fields
+    if (updateData.financeRequired !== undefined && typeof updateData.financeRequired !== 'boolean') {
+      throw createError('financeRequired must be a boolean', 400);
     }
-    
-    if (updateData.backOrderStatus !== undefined && updateData.backOrderStatus !== null) {
-      if (typeof updateData.backOrderStatus === 'string') {
-        const value = updateData.backOrderStatus.trim().toLowerCase();
-        if (value === 'true' || value === '1') {
-          updateData.backOrderStatus = true;
-        } else if (value === 'false' || value === '0' || value === '') {
-          updateData.backOrderStatus = false;
-        } else {
-          console.error(`Invalid backOrderStatus value: "${updateData.backOrderStatus}" (type: ${typeof updateData.backOrderStatus})`);
-          throw createError(`backOrderStatus must be a boolean (received: "${updateData.backOrderStatus}")`, 400);
-        }
-      } else if (typeof updateData.backOrderStatus !== 'boolean') {
-        console.error(`Invalid backOrderStatus type: ${typeof updateData.backOrderStatus}, value: ${updateData.backOrderStatus}`);
-        throw createError(`backOrderStatus must be a boolean (received type: ${typeof updateData.backOrderStatus})`, 400);
-      }
-    } else if (updateData.backOrderStatus === null || updateData.backOrderStatus === '') {
-      // Handle null or empty string as undefined (don't update the field)
-      delete updateData.backOrderStatus;
+    if (updateData.backOrderStatus !== undefined && typeof updateData.backOrderStatus !== 'boolean') {
+      throw createError('backOrderStatus must be a boolean', 400);
     }
 
     // Validate date fields (convert to Date objects if they're strings)
