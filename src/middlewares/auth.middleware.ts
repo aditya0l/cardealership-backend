@@ -153,9 +153,14 @@ export const authenticate = async (
       
       // Create user in database
       try {
+        // Generate employee ID if needed
+        const { generateEmployeeId } = await import('../utils/employee-id-generator');
+        const employeeId = await generateEmployeeId(roleName);
+        
         user = await prisma.user.create({
           data: {
             firebaseUid: uid,
+            employeeId,
             email: email || `${uid}@firebase.user`,
             name: name || email?.split('@')[0] || 'Firebase User',
             roleId: role.id,
@@ -166,7 +171,18 @@ export const authenticate = async (
           }
         });
         
-        console.log(`✅ Auto-created user: ${user.email} with role ${user.role.name}`);
+        console.log(`✅ Auto-created user: ${user.email} (${employeeId}) with role ${user.role.name}`);
+        
+        // Set custom claims in Firebase for consistency
+        try {
+          await setUserClaims(uid, {
+            role: user.role.name,
+            roleId: user.role.id,
+            employeeId: employeeId
+          });
+        } catch (claimsError) {
+          console.warn('⚠️ Failed to set custom claims, continuing...', claimsError);
+        }
       } catch (createError) {
         console.error('❌ Error auto-creating user:', createError);
         res.status(500).json({
