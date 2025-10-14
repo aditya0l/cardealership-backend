@@ -10,7 +10,7 @@ export interface DealershipRequest extends AuthenticatedRequest {
 
 /**
  * Middleware to extract and validate dealership context
- * Ensures users can only access data from their own dealership (unless they're system admin)
+ * MULTI-TENANT MODEL: ALL users (including ADMIN) belong to ONE dealership
  */
 export const dealershipContext = async (
   req: Request,
@@ -21,17 +21,11 @@ export const dealershipContext = async (
     const authenticatedReq = req as AuthenticatedRequest;
     const dealershipReq = req as DealershipRequest;
 
-    // System admins can access all dealerships
-    dealershipReq.isSystemAdmin = authenticatedReq.user.role.name === RoleName.ADMIN;
+    // In multi-tenant model: No system-wide admins
+    // ALL users (including ADMIN) belong to one dealership
+    dealershipReq.isSystemAdmin = false;
 
-    // If user is system admin, they can optionally filter by dealership via query param
-    if (dealershipReq.isSystemAdmin) {
-      dealershipReq.dealershipId = req.query.dealershipId as string || undefined;
-      next();
-      return;
-    }
-
-    // Non-admin users must have a dealership assigned
+    // ALL users must have a dealership assigned
     if (!authenticatedReq.user.dealershipId) {
       res.status(403).json({
         success: false,
@@ -40,7 +34,7 @@ export const dealershipContext = async (
       return;
     }
 
-    // Set dealership context for non-admin users
+    // Set dealership context from user (including ADMINs)
     dealershipReq.dealershipId = authenticatedReq.user.dealershipId;
 
     next();
@@ -55,23 +49,22 @@ export const dealershipContext = async (
 
 /**
  * Utility to build where clause with dealership filter
+ * MULTI-TENANT: Always filter by user's dealership
  */
 export const buildDealershipWhere = (req: DealershipRequest, additionalWhere: any = {}) => {
   const where: any = { ...additionalWhere };
 
-  // If not system admin, filter by dealership
-  if (!req.isSystemAdmin && req.dealershipId) {
+  // ALWAYS filter by user's dealership (multi-tenant isolation)
+  if (req.dealershipId) {
     where.dealershipId = req.dealershipId;
-  } else if (req.query.dealershipId) {
-    // System admin filtering by specific dealership
-    where.dealershipId = req.query.dealershipId as string;
   }
 
   return where;
 };
 
 /**
- * Middleware to ensure user can only assign data to their own dealership
+ * Middleware to AUTO-ASSIGN dealership to all created data
+ * MULTI-TENANT: All data automatically scoped to user's dealership
  */
 export const validateDealershipAssignment = async (
   req: Request,
@@ -82,25 +75,17 @@ export const validateDealershipAssignment = async (
     const authenticatedReq = req as AuthenticatedRequest;
     const { dealershipId } = req.body;
 
-    // System admins can assign to any dealership
-    if (authenticatedReq.user.role.name === RoleName.ADMIN) {
-      next();
-      return;
-    }
-
-    // Non-admins can only assign to their own dealership
+    // Users can ONLY create data in their own dealership
     if (dealershipId && dealershipId !== authenticatedReq.user.dealershipId) {
       res.status(403).json({
         success: false,
-        message: 'Cannot assign data to a different dealership'
+        message: 'Cannot create data for a different dealership'
       });
       return;
     }
 
-    // If no dealershipId provided, auto-assign user's dealership
-    if (!dealershipId && authenticatedReq.user.dealershipId) {
-      req.body.dealershipId = authenticatedReq.user.dealershipId;
-    }
+    // ALWAYS auto-assign user's dealership
+    req.body.dealershipId = authenticatedReq.user.dealershipId;
 
     next();
   } catch (error) {

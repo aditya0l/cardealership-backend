@@ -4,7 +4,6 @@ import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { canPerformAction } from '../middlewares/rbac.middleware';
 import { RoleName } from '@prisma/client';
-import { stockService } from '../services/stock.service';
 
 interface CreateVehicleRequest {
   variant: string;
@@ -246,107 +245,5 @@ export const deleteVehicle = asyncHandler(async (req: AuthenticatedRequest, res:
   res.json({
     success: true,
     message: 'Vehicle deleted successfully'
-  });
-});
-
-export const getStockStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  // Get total stock statistics
-  const totalVehicles = await prisma.vehicle.count({
-    where: { isActive: true }
-  });
-
-  const inStock = await prisma.vehicle.count({
-    where: { 
-      isActive: true,
-      totalStock: { gt: 0 }
-    }
-  });
-
-  const outOfStock = await prisma.vehicle.count({
-    where: { 
-      isActive: true,
-      totalStock: 0
-    }
-  });
-
-  // Get stock by location
-  const stockByLocation = await prisma.$queryRaw<Array<{
-    location: string;
-    total: bigint;
-  }>>`
-    SELECT 
-      'ZAWL' as location,
-      CAST(SUM(zawl_stock) AS INTEGER) as total
-    FROM "Vehicle"
-    WHERE "isActive" = true
-    UNION ALL
-    SELECT 
-      'RAS' as location,
-      CAST(SUM(ras_stock) AS INTEGER) as total
-    FROM "Vehicle"
-    WHERE "isActive" = true
-    UNION ALL
-    SELECT 
-      'Regional' as location,
-      CAST(SUM(regional_stock) AS INTEGER) as total
-    FROM "Vehicle"
-    WHERE "isActive" = true
-    UNION ALL
-    SELECT 
-      'Plant' as location,
-      CAST(SUM(plant_stock) AS INTEGER) as total
-    FROM "Vehicle"
-    WHERE "isActive" = true
-  `;
-
-  // Get top models by stock
-  const topModels = await prisma.vehicle.groupBy({
-    by: ['variant'],
-    where: { 
-      isActive: true,
-      totalStock: { gt: 0 }
-    },
-    _sum: {
-      totalStock: true
-    },
-    orderBy: {
-      _sum: {
-        totalStock: 'desc'
-      }
-    },
-    take: 10
-  });
-
-  res.json({
-    success: true,
-    data: {
-      totalVehicles,
-      inStock,
-      outOfStock,
-      stockByLocation: stockByLocation.map(item => ({
-        location: item.location,
-        total: Number(item.total)
-      })),
-      topModels: topModels.map(item => ({
-        variant: item.variant,
-        totalStock: item._sum.totalStock || 0
-      }))
-    }
-  });
-});
-
-export const getStockStatusByVariant = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { variantCode } = req.params;
-
-  if (!variantCode) {
-    throw createError('Variant code is required', 400);
-  }
-
-  // Get stock status (informational only - does not block any operations)
-  const stockStatus = await stockService.getStockStatus(variantCode);
-
-  res.json({
-    success: true,
-    data: stockStatus
   });
 });

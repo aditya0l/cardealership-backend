@@ -18,15 +18,7 @@ export const config = {
   // Firebase Configuration
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || '',
-    privateKey: (() => {
-      const key = process.env.FIREBASE_PRIVATE_KEY || '';
-      // Handle different formats of private key
-      if (key.includes('\\n')) {
-        return key.replace(/\\n/g, '\n');
-      }
-      // If already has real newlines, return as is
-      return key;
-    })(),
+    privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n') || '',
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL || '',
     databaseURL: process.env.FIREBASE_DATABASE_URL || '',
   }

@@ -163,6 +163,12 @@ export const createUserWithCredentials = asyncHandler(async (req: AuthenticatedR
     // Generate custom employee ID based on role
     const employeeId = await generateEmployeeId(roleName);
 
+    // MULTI-TENANT: Auto-assign creator's dealership
+    const creatorDealershipId = req.user.dealershipId;
+    if (!creatorDealershipId) {
+      throw createError('Creator must be assigned to a dealership to create users', 403);
+    }
+
     // Create user in our database
     const user = await prisma.user.create({
       data: {
@@ -171,6 +177,7 @@ export const createUserWithCredentials = asyncHandler(async (req: AuthenticatedR
         name,
         email,
         roleId: role.id,
+        dealershipId: creatorDealershipId, // 🆕 AUTO-ASSIGN creator's dealership
         isActive: true
       },
       include: {
@@ -218,7 +225,7 @@ export const createUserWithCredentials = asyncHandler(async (req: AuthenticatedR
 });
 
 // Admin endpoint to create user in Firebase and our database
-export const createUser = asyncHandler(async (req: Request, res: Response) => {
+export const createUser = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { firebaseUid, name, email, roleName }: CreateUserRequest = req.body;
 
   // Validate input
@@ -251,13 +258,20 @@ export const createUser = asyncHandler(async (req: Request, res: Response) => {
     throw createError('Firebase user not found', 404);
   }
 
+  // MULTI-TENANT: Auto-assign creator's dealership
+  const creatorDealershipId = req.user.dealershipId;
+  if (!creatorDealershipId) {
+    throw createError('Creator must be assigned to a dealership to create users', 403);
+  }
+
   // Create user in our database
   const user = await prisma.user.create({
     data: {
       firebaseUid,
       name,
       email,
-      roleId: role.id
+      roleId: role.id,
+      dealershipId: creatorDealershipId // 🆕 AUTO-ASSIGN creator's dealership
     },
     include: {
       role: true
@@ -365,6 +379,45 @@ export const activateUser = asyncHandler(async (req: Request, res: Response) => 
     success: true,
     message: 'User activated successfully',
     data: { user }
+  });
+});
+
+export const deleteUser = asyncHandler(async (req: Request, res: Response) => {
+  const { firebaseUid } = req.params;
+
+  // Check if user exists
+  const user = await prisma.user.findUnique({
+    where: { firebaseUid },
+    include: { role: true }
+  });
+
+  if (!user) {
+    throw createError('User not found', 404);
+  }
+
+  // Delete from database first
+  await prisma.user.delete({
+    where: { firebaseUid }
+  });
+
+  // Then delete from Firebase
+  try {
+    await auth.deleteUser(firebaseUid);
+  } catch (firebaseError) {
+    console.warn('Failed to delete from Firebase (user might not exist):', firebaseError);
+    // Continue - database deletion is more important
+  }
+
+  res.json({
+    success: true,
+    message: 'User deleted successfully',
+    data: {
+      deletedUser: {
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        name: user.name
+      }
+    }
   });
 });
 

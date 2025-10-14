@@ -7,6 +7,7 @@ import {
   updateUserRole,
   deactivateUser,
   activateUser,
+  deleteUser,
   resetUserPassword,
   getAllUsers,
   getUsersByRole,
@@ -36,6 +37,7 @@ router.put('/users/:firebaseUid/manager', authenticate, authorize([RoleName.ADMI
 router.put('/users/:firebaseUid/password', authenticate, authorize([RoleName.ADMIN]), resetUserPassword); // Reset user password
 router.put('/users/:firebaseUid/deactivate', authenticate, authorize([RoleName.ADMIN]), deactivateUser); // Deactivate user
 router.put('/users/:firebaseUid/activate', authenticate, authorize([RoleName.ADMIN]), activateUser); // Activate user
+router.delete('/users/:firebaseUid', authenticate, authorize([RoleName.ADMIN]), deleteUser); // Delete user
 
 // Firebase sync route - Admin only
 router.post('/sync-firebase-users', authenticate, authorize([RoleName.ADMIN]), syncFirebaseUsers); // Sync all Firebase users to database
