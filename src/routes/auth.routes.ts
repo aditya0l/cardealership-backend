@@ -26,6 +26,7 @@ router.post('/login', login); // User login with email/password
 // Protected routes - require Firebase authentication
 router.post('/sync', authenticate, syncUser); // Sync Firebase user to our database
 router.get('/profile', authenticate, getProfile); // Get current user profile
+router.get('/me', authenticate, getProfile); // Alias for profile (commonly used)
 
 // Admin routes - require specific permissions
 router.post('/users/create-with-credentials', authenticate, authorize([RoleName.ADMIN]), createUserWithCredentials); // Create user with email/password
