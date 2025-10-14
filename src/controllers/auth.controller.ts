@@ -292,12 +292,37 @@ export const createUser = asyncHandler(async (req: AuthenticatedRequest, res: Re
 });
 
 export const getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const user = req.user;
+  // Fetch full user data from database including dealership
+  const user = await prisma.user.findUnique({
+    where: { firebaseUid: req.user.firebaseUid },
+    include: {
+      role: true,
+      dealership: true // Include dealership relation
+    }
+  });
+
+  if (!user) {
+    throw createError('User not found', 404);
+  }
 
   res.json({
     success: true,
     message: 'Profile retrieved successfully',
-    data: { user }
+    data: { 
+      user: {
+        firebaseUid: user.firebaseUid,
+        email: user.email,
+        name: user.name,
+        role: {
+          id: user.role.id,
+          name: user.role.name
+        },
+        dealershipId: user.dealershipId,
+        dealership: user.dealership, // Now included!
+        isActive: user.isActive,
+        employeeId: user.employeeId
+      }
+    }
   });
 });
 
