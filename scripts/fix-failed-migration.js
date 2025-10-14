@@ -18,7 +18,8 @@ async function fixFailedMigration() {
       DELETE FROM "_prisma_migrations" 
       WHERE migration_name IN (
         '20251011_add_employee_hierarchy_stock_and_models',
-        '20251011060000_cleanup_failed_migration'
+        '20251011060000_cleanup_failed_migration',
+        '20251014_multitenant_dealership_required'
       )
       AND finished_at IS NULL;
     `);
