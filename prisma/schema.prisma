@@ -32,7 +32,7 @@ model User {
   assignedEnquiries Enquiry[]         @relation("AssignedTo")
   createdEnquiries  Enquiry[]         @relation("CreatedBy")
   role              Role              @relation(fields: [roleId], references: [id])
-  dealership        Dealer?           @relation(fields: [dealershipId], references: [id])
+  dealership        Dealership?       @relation(fields: [dealershipId], references: [id])
   manager           User?             @relation("ManagerSubordinates", fields: [managerId], references: [firebaseUid], onDelete: SetNull)
   subordinates      User[]            @relation("ManagerSubordinates")
 
@@ -58,60 +58,60 @@ model Enquiry {
   variant             String?
   dealerCode          String?         @map("dealer_code")
   bookings            Booking[]
-  assignedTo          User?         @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
-  createdBy           User          @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
+  assignedTo          User?           @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
+  createdBy           User            @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
   quotations          Quotation[]
 
   @@map("enquiries")
 }
 
 model Booking {
-  id                   String            @id @default(cuid())
-  customerName         String            @map("customer_name")
-  status               BookingStatus     @default(PENDING)
-  enquiryId            String?           @map("enquiry_id")
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
-  customerPhone        String?           @map("customer_phone")
-  customerEmail        String?           @map("customer_email")
-  dealerId             String?           @map("dealer_id")
-  advisorId            String?           @map("advisor_id")
-  bookingDate          DateTime?         @map("booking_date")
-  source               BookingSource     @default(MANUAL)
+  id                   String             @id @default(cuid())
+  customerName         String             @map("customer_name")
+  status               BookingStatus      @default(PENDING)
+  enquiryId            String?            @map("enquiry_id")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  customerPhone        String?            @map("customer_phone")
+  customerEmail        String?            @map("customer_email")
+  dealerId             String?            @map("dealer_id")
+  advisorId            String?            @map("advisor_id")
+  bookingDate          DateTime?          @map("booking_date")
+  source               BookingSource      @default(MANUAL)
   metadata             Json?
   zone                 String?
   region               String?
-  optyId               String?           @unique @map("opty_id")
+  optyId               String?            @unique @map("opty_id")
   variant              String?
-  vcCode               String?           @map("vc_code")
+  vcCode               String?            @map("vc_code")
   color                String?
-  fuelType             String?           @map("fuel_type")
+  fuelType             String?            @map("fuel_type")
   transmission         String?
-  expectedDeliveryDate DateTime?         @map("expected_delivery_date")
+  expectedDeliveryDate DateTime?          @map("expected_delivery_date")
   division             String?
-  empName              String?           @map("emp_name")
-  employeeLogin        String?           @map("employee_login")
-  financeRequired      Boolean?          @map("finance_required")
-  financerName         String?           @map("financer_name")
-  fileLoginDate        DateTime?           @map("file_login_date")
-  approvalDate         DateTime?           @map("approval_date")
-  stockAvailability    StockAvailability?  @map("stock_availability")
-  backOrderStatus      Boolean?            @map("back_order_status")
-  rtoDate              DateTime?         @map("rto_date")
-  
+  empName              String?            @map("emp_name")
+  employeeLogin        String?            @map("employee_login")
+  financeRequired      Boolean?           @map("finance_required")
+  financerName         String?            @map("financer_name")
+  fileLoginDate        DateTime?          @map("file_login_date")
+  approvalDate         DateTime?          @map("approval_date")
+  stockAvailability    StockAvailability? @map("stock_availability")
+  backOrderStatus      Boolean?           @map("back_order_status")
+  rtoDate              DateTime?          @map("rto_date")
+
   // Role-specific remarks fields
-  remarks              String?                          // Legacy/general remarks
-  advisorRemarks       String?           @map("advisor_remarks")       // Customer Advisor remarks
-  teamLeadRemarks      String?           @map("team_lead_remarks")     // Team Lead remarks
-  salesManagerRemarks  String?           @map("sales_manager_remarks") // Sales Manager remarks
-  generalManagerRemarks String?          @map("general_manager_remarks") // General Manager remarks
-  adminRemarks         String?           @map("admin_remarks")         // Admin remarks
-  
-  dealerCode           String            @map("dealer_code")
-  auditLogs            BookingAuditLog[]
-  advisor              User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
-  dealer               Dealer?           @relation(fields: [dealerId], references: [id])
-  enquiry              Enquiry?          @relation(fields: [enquiryId], references: [id])
+  remarks               String? // Legacy/general remarks
+  advisorRemarks        String? @map("advisor_remarks") // Customer Advisor remarks
+  teamLeadRemarks       String? @map("team_lead_remarks") // Team Lead remarks
+  salesManagerRemarks   String? @map("sales_manager_remarks") // Sales Manager remarks
+  generalManagerRemarks String? @map("general_manager_remarks") // General Manager remarks
+  adminRemarks          String? @map("admin_remarks") // Admin remarks
+
+  dealerCode String            @map("dealer_code")
+  auditLogs  BookingAuditLog[]
+  advisor    User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
+  dealer     Dealer?           @relation(fields: [dealerId], references: [id])
+  enquiry    Enquiry?          @relation(fields: [enquiryId], references: [id])
 
   @@map("bookings")
 }
@@ -131,6 +131,47 @@ model Dealer {
   vehicles   Vehicle[]
 
   @@map("dealers")
+}
+
+// Multi-Dealership System Model
+model Dealership {
+  id                  String         @id @default(cuid())
+  name                String
+  code                String         @unique
+  type                DealershipType
+  email               String
+  phone               String
+  address             String
+  city                String
+  state               String
+  pincode             String
+  gstNumber           String?        @map("gst_number")
+  panNumber           String?        @map("pan_number")
+  brands              String[]       @default([])
+  isActive            Boolean        @default(true) @map("is_active")
+  onboardingCompleted Boolean        @default(false) @map("onboarding_completed")
+  createdAt           DateTime       @default(now()) @map("created_at")
+  updatedAt           DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  users User[]
+
+  @@map("dealerships")
+}
+
+// Vehicle Catalog Model
+model VehicleCatalog {
+  id           String   @id @default(cuid())
+  dealershipId String   @map("dealership_id")
+  brand        String
+  model        String
+  variants     Json // Store variants as JSON
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([dealershipId, brand, model])
+  @@map("vehicle_catalogs")
 }
 
 model BookingImport {
@@ -201,17 +242,17 @@ model Quotation {
 }
 
 model Model {
-  id              String    @id @default(cuid())
-  brand           String    // "Tata", "Honda", "Maruti"
-  modelName       String    @map("model_name") // "Nexon", "Harrier", "Safari"
-  segment         String?   // "SUV", "Sedan", "Hatchback"
-  description     String?
-  basePrice       Float?    @map("base_price")
-  isActive        Boolean   @default(true) @map("is_active")
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-  vehicles        Vehicle[]
-  
+  id          String    @id @default(cuid())
+  brand       String // "Tata", "Honda", "Maruti"
+  modelName   String    @map("model_name") // "Nexon", "Harrier", "Safari"
+  segment     String? // "SUV", "Sedan", "Hatchback"
+  description String?
+  basePrice   Float?    @map("base_price")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  vehicles    Vehicle[]
+
   @@unique([brand, modelName])
   @@map("models")
 }
@@ -220,8 +261,8 @@ model Vehicle {
   id                  String   @id @default(cuid())
   activeVC            String?  @unique @map("active_vc")
   vcCode              String?  @map("vc_code")
-  variant             String?  // "Nexon XZ+ Petrol AT"
-  trim                String?  // "XZ+", "XM", "XZ+ Lux"
+  variant             String? // "Nexon XZ+ Petrol AT"
+  trim                String? // "XZ+", "XM", "XZ+ Lux"
   color               String?
   fuelType            String?  @map("fuel_type")
   transmission        String?
@@ -278,9 +319,9 @@ enum EnquiryStatus {
 }
 
 enum EnquiryCategory {
-  HOT     // High priority, likely to convert
-  LOST    // Customer lost/not interested
-  BOOKED  // Converted to booking
+  HOT // High priority, likely to convert
+  LOST // Customer lost/not interested
+  BOOKED // Converted to booking
 }
 
 enum BookingStatus {
@@ -333,6 +374,15 @@ enum QuotationStatus {
 }
 
 enum StockAvailability {
-  VNA                 // Vehicle Not Available
-  VEHICLE_AVAILABLE   // Vehicle Available
+  VNA // Vehicle Not Available
+  VEHICLE_AVAILABLE // Vehicle Available
+}
+
+enum DealershipType {
+  TATA
+  UNIVERSAL
+  MAHINDRA
+  HYUNDAI
+  MARUTI
+  OTHER
 }
