@@ -127,12 +127,29 @@ export const authenticate = async (
       }
     });
 
-    // AUTO-CREATE USER: If user doesn't exist in database but has valid Firebase token, create them
+    // MULTI-TENANT: DISABLE auto-create - users must be created by admin
+    if (!user) {
+      console.error(`❌ User not found in database: ${email || uid}`);
+      console.error('   In multi-tenant mode, users must be created by an admin.');
+      res.status(403).json({
+        success: false,
+        message: 'User account not found. Please ask your administrator to create your account with proper role and dealership assignment.'
+      });
+      return;
+    }
+    
+    /* DISABLED AUTO-CREATE in multi-tenant mode
+    // OLD AUTO-CREATE CODE (disabled to enforce proper user creation)
     if (!user) {
       console.log(`🔧 Auto-creating user for Firebase UID: ${uid}, Email: ${email || 'unknown'}`);
       
-      // Determine role from Firebase custom claims or default to ADMIN
-      let roleName: RoleName = RoleName.ADMIN;
+      // IMPORTANT: Auto-create should be DISABLED in multi-tenant
+      // Users should be created explicitly via admin API with dealership assignment
+      console.warn('⚠️  AUTO-CREATE USER: This user was not created through proper channels!');
+      console.warn('   In multi-tenant mode, users should be created by admins with dealership assignment.');
+      
+      // Determine role from Firebase custom claims or default to CUSTOMER_ADVISOR (safest)
+      let roleName: RoleName = RoleName.CUSTOMER_ADVISOR; // Changed from ADMIN to safer default
       if (decodedToken.customClaims?.role) {
         roleName = decodedToken.customClaims.role as RoleName;
       }
@@ -151,6 +168,25 @@ export const authenticate = async (
         return;
       }
       
+      // MULTI-TENANT: Find a default dealership or reject
+      let defaultDealershipId = null;
+      const defaultDealership = await prisma.dealership.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' }
+      });
+      
+      if (defaultDealership) {
+        defaultDealershipId = defaultDealership.id;
+        console.log(`   Assigning to dealership: ${defaultDealership.name}`);
+      } else {
+        console.error('❌ No dealership available for auto-created user!');
+        res.status(500).json({
+          success: false,
+          message: 'No dealership available. Please contact administrator to set up your account.'
+        });
+        return;
+      }
+      
       // Create user in database
       try {
         // Generate employee ID if needed
@@ -164,10 +200,12 @@ export const authenticate = async (
             email: email || `${uid}@firebase.user`,
             name: name || email?.split('@')[0] || 'Firebase User',
             roleId: role.id,
+            dealershipId: defaultDealershipId, // Assign to default dealership
             isActive: true
           },
           include: {
-            role: true
+            role: true,
+            dealership: true
           }
         });
         
@@ -192,6 +230,7 @@ export const authenticate = async (
         return;
       }
     }
+    */  // End of disabled auto-create code
 
     // For custom tokens, use email/name from database
     if (!email) {
