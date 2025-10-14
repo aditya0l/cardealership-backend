@@ -343,10 +343,16 @@ export const updateUserRole = asyncHandler(async (req: Request, res: Response) =
     throw createError('Invalid role specified', 400);
   }
 
-  // Update user in database
+  // Generate new employee ID to match the new role
+  const newEmployeeId = await generateEmployeeId(roleName);
+
+  // Update user in database with new role AND employee ID
   const user = await prisma.user.update({
     where: { firebaseUid },
-    data: { roleId: role.id },
+    data: { 
+      roleId: role.id,
+      employeeId: newEmployeeId // Update employee ID to match role
+    },
     include: { role: true }
   });
 
