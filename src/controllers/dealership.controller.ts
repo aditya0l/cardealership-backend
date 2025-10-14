@@ -4,9 +4,19 @@ import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { RoleName, DealershipType } from '@prisma/client';
 
-// Create new dealership (Admin only)
+// Create new dealership
+// MULTI-TENANT: Only admins WITHOUT a dealership can create one (initial setup)
+// Or use this for super-admin/system setup only
 export const createDealership = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  // Check if user is admin
+  // MULTI-TENANT RESTRICTION: Admins can only create ONE dealership
+  if (req.user.dealershipId) {
+    throw createError(
+      'You are already managing a dealership. In multi-tenant mode, each admin manages only one dealership.',
+      403
+    );
+  }
+
+  // Only ADMIN role can create dealerships
   if (req.user.role.name !== RoleName.ADMIN) {
     throw createError('Only admins can create dealerships', 403);
   }
@@ -27,8 +37,8 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
   } = req.body;
 
   // Validate required fields
-  if (!name || !code || !type || !email || !phone) {
-    throw createError('Name, code, type, email, and phone are required', 400);
+  if (!name || !code || !type || !email || !phone || !address || !city || !state || !pincode) {
+    throw createError('Name, code, type, email, phone, address, city, state, and pincode are required', 400);
   }
 
   // Check if code already exists
@@ -47,10 +57,10 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
       type,
       email,
       phone,
-      address: address || '',
-      city: city || '',
-      state: state || '',
-      pincode: pincode || '',
+      address,
+      city,
+      state,
+      pincode,
       gstNumber,
       panNumber,
       brands: brands || [],
@@ -59,15 +69,22 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
     }
   });
 
+  // IMPORTANT: Auto-assign the creator (admin) to this dealership
+  await prisma.user.update({
+    where: { firebaseUid: req.user.firebaseUid },
+    data: { dealershipId: dealership.id }
+  });
+
   res.status(201).json({
     success: true,
-    message: 'Dealership created successfully',
+    message: 'Dealership created successfully. You are now assigned to this dealership.',
     data: { dealership }
   });
 });
 
 // Get all dealerships with pagination and filters
-export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+// MULTI-TENANT: Returns only the user's own dealership
+export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const skip = (page - 1) * limit;
@@ -78,6 +95,23 @@ export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, 
 
   // Build where clause
   const where: any = {};
+  
+  // MULTI-TENANT: Filter by user's dealership
+  if (!req.user.dealershipId) {
+    // User has no dealership - return empty
+    res.json({
+      success: true,
+      message: 'No dealership assigned',
+      data: {
+        dealerships: [],
+        pagination: { page, limit, total: 0, totalPages: 0 }
+      }
+    });
+    return;
+  }
+  
+  where.id = req.user.dealershipId;
+  
   if (type) where.type = type;
   if (isActive !== undefined) where.isActive = isActive;
   if (search) {
