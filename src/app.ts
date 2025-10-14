@@ -12,6 +12,7 @@ import quotationsRoutes from './routes/quotations.routes';
 import stockRoutes from './routes/stock.routes'; // Updated to use Vehicle model with RBAC
 import dashboardRoutes from './routes/dashboard.routes';
 import modelRoutes from './routes/model.routes';
+import dealershipRoutes from './routes/dealership.routes'; // Multi-tenant dealership system
 
 // Import middleware
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
@@ -110,6 +111,7 @@ app.use('/api/quotations', quotationsRoutes); // Re-enabled with RBAC
 app.use('/api/stock', stockRoutes); // Re-enabled with Vehicle model and RBAC
 app.use('/api/models', modelRoutes); // Model master data management
 app.use('/api/dashboard', dashboardRoutes); // Dashboard analytics endpoints
+app.use('/api/dealerships', dealershipRoutes); // Multi-tenant dealership system
 
 // Catch 404 and forward to error handler
 app.use(notFoundHandler);
