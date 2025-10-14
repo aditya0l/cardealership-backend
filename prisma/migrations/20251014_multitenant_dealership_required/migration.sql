@@ -77,7 +77,7 @@ BEGIN
     ALTER TABLE users 
       ADD CONSTRAINT users_dealership_id_not_null CHECK (dealership_id IS NOT NULL);
   END IF;
+  
+  RAISE NOTICE '✅ Multi-tenant dealership migration completed successfully!';
 END $$;
-
-RAISE NOTICE '✅ Multi-tenant dealership migration completed successfully!';
 
