@@ -57,9 +57,11 @@ model Enquiry {
   source              EnquirySource   @default(WALK_IN)
   variant             String?
   dealerCode          String?         @map("dealer_code")
+  dealershipId        String?         @map("dealership_id") // Multi-tenant dealership
   bookings            Booking[]
   assignedTo          User?           @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
   createdBy           User            @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
+  dealership          Dealership?     @relation("DealershipEnquiries", fields: [dealershipId], references: [id])
   quotations          Quotation[]
 
   @@map("enquiries")
@@ -107,11 +109,13 @@ model Booking {
   generalManagerRemarks String? @map("general_manager_remarks") // General Manager remarks
   adminRemarks          String? @map("admin_remarks") // Admin remarks
 
-  dealerCode String            @map("dealer_code")
-  auditLogs  BookingAuditLog[]
-  advisor    User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
-  dealer     Dealer?           @relation(fields: [dealerId], references: [id])
-  enquiry    Enquiry?          @relation(fields: [enquiryId], references: [id])
+  dealerCode   String            @map("dealer_code")
+  dealershipId String?           @map("dealership_id") // Multi-tenant dealership
+  auditLogs    BookingAuditLog[]
+  advisor      User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
+  dealer       Dealer?           @relation(fields: [dealerId], references: [id])
+  dealership   Dealership?       @relation("DealershipBookings", fields: [dealershipId], references: [id])
+  enquiry      Enquiry?          @relation(fields: [enquiryId], references: [id])
 
   @@map("bookings")
 }
@@ -154,21 +158,27 @@ model Dealership {
   updatedAt           DateTime       @updatedAt @map("updated_at")
 
   // Relations
-  users User[]
+  users           User[]
+  vehicleCatalogs VehicleCatalog[]
+  bookings        Booking[]        @relation("DealershipBookings")
+  enquiries       Enquiry[]        @relation("DealershipEnquiries")
+  quotations      Quotation[]      @relation("DealershipQuotations")
+  vehicles        Vehicle[]        @relation("DealershipVehicles")
 
   @@map("dealerships")
 }
 
 // Vehicle Catalog Model
 model VehicleCatalog {
-  id           String   @id @default(cuid())
-  dealershipId String   @map("dealership_id")
+  id           String     @id @default(cuid())
+  dealershipId String     @map("dealership_id")
   brand        String
   model        String
   variants     Json // Store variants as JSON
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  dealership   Dealership @relation(fields: [dealershipId], references: [id], onDelete: Cascade)
 
   @@unique([dealershipId, brand, model])
   @@map("vehicle_catalogs")
@@ -229,14 +239,16 @@ model BookingAuditLog {
 }
 
 model Quotation {
-  id        String          @id @default(cuid())
-  enquiryId String
-  amount    Float
-  status    QuotationStatus @default(PENDING)
-  pdfUrl    String?
-  createdAt DateTime        @default(now())
-  updatedAt DateTime        @updatedAt
-  enquiry   Enquiry         @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  id           String          @id @default(cuid())
+  enquiryId    String
+  amount       Float
+  status       QuotationStatus @default(PENDING)
+  pdfUrl       String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  dealershipId String?         @map("dealership_id") // Multi-tenant dealership
+  enquiry      Enquiry         @relation(fields: [enquiryId], references: [id], onDelete: Cascade)
+  dealership   Dealership?     @relation("DealershipQuotations", fields: [dealershipId], references: [id])
 
   @@map("quotations")
 }
@@ -258,48 +270,50 @@ model Model {
 }
 
 model Vehicle {
-  id                  String   @id @default(cuid())
-  activeVC            String?  @unique @map("active_vc")
-  vcCode              String?  @map("vc_code")
+  id                  String      @id @default(cuid())
+  activeVC            String?     @unique @map("active_vc")
+  vcCode              String?     @map("vc_code")
   variant             String? // "Nexon XZ+ Petrol AT"
   trim                String? // "XZ+", "XM", "XZ+ Lux"
   color               String?
-  fuelType            String?  @map("fuel_type")
+  fuelType            String?     @map("fuel_type")
   transmission        String?
-  modelId             String?  @map("model_id") // Link to Model master
-  zawlStock           Int      @default(0) @map("zawl_stock") // Stock quantity
-  rasStock            Int      @default(0) @map("ras_stock") // Stock quantity
-  regionalStock       Int      @default(0) @map("regional_stock") // Stock quantity
-  plantStock          Int      @default(0) @map("plant_stock") // Stock quantity
-  totalStock          Int      @default(0) @map("total_stock") // Auto-computed total
+  modelId             String?     @map("model_id") // Link to Model master
+  zawlStock           Int         @default(0) @map("zawl_stock") // Stock quantity
+  rasStock            Int         @default(0) @map("ras_stock") // Stock quantity
+  regionalStock       Int         @default(0) @map("regional_stock") // Stock quantity
+  plantStock          Int         @default(0) @map("plant_stock") // Stock quantity
+  totalStock          Int         @default(0) @map("total_stock") // Auto-computed total
   ppl                 String?
-  dealerId            String?  @map("dealer_id")
-  dealerType          String?  @map("dealer_type")
-  exShowroomPrice     Float?   @map("ex_showroom_price")
-  consumerDiscount    Float?   @map("consumer_discount")
-  greenBonus          Float?   @map("green_bonus")
-  existingICEDiscount Float?   @map("existing_ice_discount")
-  existingEVDiscount  Float?   @map("existing_ev_discount")
+  dealerId            String?     @map("dealer_id")
+  dealerType          String?     @map("dealer_type")
+  exShowroomPrice     Float?      @map("ex_showroom_price")
+  consumerDiscount    Float?      @map("consumer_discount")
+  greenBonus          Float?      @map("green_bonus")
+  existingICEDiscount Float?      @map("existing_ice_discount")
+  existingEVDiscount  Float?      @map("existing_ev_discount")
   intervention        Float?
-  exchangeScrappage   Float?   @map("exchange_scrappage")
-  corporateDiscount   Float?   @map("corporate_discount")
-  ruralGovtDiscount   Float?   @map("rural_govt_discount")
-  additionalDiscount  Float?   @map("additional_discount")
-  finalBillingPrice   Float?   @map("final_billing_price")
-  insurance75         Float?   @map("insurance_75")
-  byDealer            Float?   @map("by_dealer")
-  selfCost            Float?   @map("self_cost")
-  normalRTO           Float?   @map("normal_rto")
+  exchangeScrappage   Float?      @map("exchange_scrappage")
+  corporateDiscount   Float?      @map("corporate_discount")
+  ruralGovtDiscount   Float?      @map("rural_govt_discount")
+  additionalDiscount  Float?      @map("additional_discount")
+  finalBillingPrice   Float?      @map("final_billing_price")
+  insurance75         Float?      @map("insurance_75")
+  byDealer            Float?      @map("by_dealer")
+  selfCost            Float?      @map("self_cost")
+  normalRTO           Float?      @map("normal_rto")
   trc                 Float?
   bh                  Float?
-  tcs                 Float?   @map("tcs_1_percent")
+  tcs                 Float?      @map("tcs_1_percent")
   fastag              Float?
-  onRoadPrice         Float?   @map("on_road_price")
-  isActive            Boolean  @default(true) @map("is_active")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
-  dealer              Dealer?  @relation(fields: [dealerId], references: [id])
-  model               Model?   @relation(fields: [modelId], references: [id])
+  onRoadPrice         Float?      @map("on_road_price")
+  isActive            Boolean     @default(true) @map("is_active")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+  dealershipId        String?     @map("dealership_id") // Multi-tenant dealership
+  dealer              Dealer?     @relation(fields: [dealerId], references: [id])
+  dealership          Dealership? @relation("DealershipVehicles", fields: [dealershipId], references: [id])
+  model               Model?      @relation(fields: [modelId], references: [id])
 
   @@map("vehicles")
 }
