@@ -149,34 +149,29 @@ export const authenticate = async (
           return;
         }
         
-        // Find or create a default dealership for new admins
-        let defaultDealership = await prisma.dealership.findFirst({
-          where: { isActive: true },
-          orderBy: { createdAt: 'asc' }
-        });
+        // Create a UNIQUE dealership for each new admin (ONE ADMIN = ONE DEALERSHIP)
+        const dealershipCode = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const adminName = name || email?.split('@')[0] || 'New Admin';
         
-        // If no dealership exists, create a default one
-        if (!defaultDealership) {
-          defaultDealership = await prisma.dealership.create({
-            data: {
-              name: 'Default Dealership',
-              code: 'DEFAULT001',
-              type: 'UNIVERSAL',
-              email: email || `${uid}@firebase.user`,
-              phone: '+1234567890',
-              address: 'Default Address',
-              city: 'Default City',
-              state: 'Default State',
-              pincode: '12345',
-              gstNumber: 'DEFAULT123456789',
-              panNumber: 'DEFAULT1234H',
-              brands: ['DEFAULT'],
-              isActive: true,
-              onboardingCompleted: false
-            }
-          });
-          console.log(`🏢 Created default dealership: ${defaultDealership.name}`);
-        }
+        const defaultDealership = await prisma.dealership.create({
+          data: {
+            name: `${adminName}'s Dealership`,
+            code: dealershipCode,
+            type: 'UNIVERSAL',
+            email: email || `${uid}@firebase.user`,
+            phone: '+1234567890',
+            address: 'To be configured',
+            city: 'To be configured',
+            state: 'To be configured',
+            pincode: '00000',
+            gstNumber: 'TO_BE_CONFIGURED',
+            panNumber: 'TO_BE_CONFIGURED',
+            brands: ['TO_BE_CONFIGURED'],
+            isActive: true,
+            onboardingCompleted: false
+          }
+        });
+        console.log(`🏢 Created unique dealership for new admin: ${defaultDealership.name}`);
 
         // Create user with ADMIN role and assign to default dealership
         user = await prisma.user.create({
@@ -217,32 +212,28 @@ export const authenticate = async (
               where: { name: RoleName.ADMIN }
             });
             
-            // Find or create default dealership for retry
-            let defaultDealership = await prisma.dealership.findFirst({
-              where: { isActive: true },
-              orderBy: { createdAt: 'asc' }
-            });
+            // Create unique dealership for retry (ONE ADMIN = ONE DEALERSHIP)
+            const dealershipCode = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const adminName = name || email?.split('@')[0] || 'New Admin';
             
-            if (!defaultDealership) {
-              defaultDealership = await prisma.dealership.create({
-                data: {
-                  name: 'Default Dealership',
-                  code: 'DEFAULT001',
-                  type: 'UNIVERSAL',
-                  email: email || `${uid}@firebase.user`,
-                  phone: '+1234567890',
-                  address: 'Default Address',
-                  city: 'Default City',
-                  state: 'Default State',
-                  pincode: '12345',
-                  gstNumber: 'DEFAULT123456789',
-                  panNumber: 'DEFAULT1234H',
-                  brands: ['DEFAULT'],
-                  isActive: true,
-                  onboardingCompleted: false
-                }
-              });
-            }
+            const defaultDealership = await prisma.dealership.create({
+              data: {
+                name: `${adminName}'s Dealership`,
+                code: dealershipCode,
+                type: 'UNIVERSAL',
+                email: email || `${uid}@firebase.user`,
+                phone: '+1234567890',
+                address: 'To be configured',
+                city: 'To be configured',
+                state: 'To be configured',
+                pincode: '00000',
+                gstNumber: 'TO_BE_CONFIGURED',
+                panNumber: 'TO_BE_CONFIGURED',
+                brands: ['TO_BE_CONFIGURED'],
+                isActive: true,
+                onboardingCompleted: false
+              }
+            });
 
             user = await prisma.user.create({
               data: {
