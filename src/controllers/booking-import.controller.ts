@@ -896,7 +896,7 @@ export const generateExcelTemplate = asyncHandler(async (req: Request, res: Resp
   }
 
   // Add alternating row colors
-  worksheet.eachRow((row, rowNumber) => {
+  worksheet.eachRow((row: any, rowNumber: number) => {
     if (rowNumber > 1 && rowNumber % 2 === 0) {
       row.fill = {
         type: 'pattern',
@@ -908,7 +908,7 @@ export const generateExcelTemplate = asyncHandler(async (req: Request, res: Resp
 
   // Add data validation for status column
   const statusCol = worksheet.getColumn('status');
-  statusCol.eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+  statusCol.eachCell({ includeEmpty: true }, (cell: any, rowNumber: number) => {
     if (rowNumber > 1) {
       cell.dataValidation = {
         type: 'list',
