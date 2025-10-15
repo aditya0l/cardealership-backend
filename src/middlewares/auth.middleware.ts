@@ -149,7 +149,36 @@ export const authenticate = async (
           return;
         }
         
-        // Create user with ADMIN role (no dealership initially)
+        // Find or create a default dealership for new admins
+        let defaultDealership = await prisma.dealership.findFirst({
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' }
+        });
+        
+        // If no dealership exists, create a default one
+        if (!defaultDealership) {
+          defaultDealership = await prisma.dealership.create({
+            data: {
+              name: 'Default Dealership',
+              code: 'DEFAULT001',
+              type: 'UNIVERSAL',
+              email: email || `${uid}@firebase.user`,
+              phone: '+1234567890',
+              address: 'Default Address',
+              city: 'Default City',
+              state: 'Default State',
+              pincode: '12345',
+              gstNumber: 'DEFAULT123456789',
+              panNumber: 'DEFAULT1234H',
+              brands: ['DEFAULT'],
+              isActive: true,
+              onboardingCompleted: false
+            }
+          });
+          console.log(`🏢 Created default dealership: ${defaultDealership.name}`);
+        }
+
+        // Create user with ADMIN role and assign to default dealership
         user = await prisma.user.create({
           data: {
             firebaseUid: uid,
@@ -158,7 +187,7 @@ export const authenticate = async (
             roleId: adminRole.id,
             isActive: true,
             employeeId: `ADM_${Date.now()}`,
-            dealershipId: null // No dealership initially - they can create one
+            dealershipId: defaultDealership.id // Assign to default dealership
           },
           include: {
             role: true,
@@ -188,6 +217,33 @@ export const authenticate = async (
               where: { name: RoleName.ADMIN }
             });
             
+            // Find or create default dealership for retry
+            let defaultDealership = await prisma.dealership.findFirst({
+              where: { isActive: true },
+              orderBy: { createdAt: 'asc' }
+            });
+            
+            if (!defaultDealership) {
+              defaultDealership = await prisma.dealership.create({
+                data: {
+                  name: 'Default Dealership',
+                  code: 'DEFAULT001',
+                  type: 'UNIVERSAL',
+                  email: email || `${uid}@firebase.user`,
+                  phone: '+1234567890',
+                  address: 'Default Address',
+                  city: 'Default City',
+                  state: 'Default State',
+                  pincode: '12345',
+                  gstNumber: 'DEFAULT123456789',
+                  panNumber: 'DEFAULT1234H',
+                  brands: ['DEFAULT'],
+                  isActive: true,
+                  onboardingCompleted: false
+                }
+              });
+            }
+
             user = await prisma.user.create({
               data: {
                 firebaseUid: uid,
@@ -196,7 +252,7 @@ export const authenticate = async (
                 roleId: adminRole!.id,
                 isActive: true,
                 employeeId: `ADM_${Date.now()}`,
-                dealershipId: null
+                dealershipId: defaultDealership.id
               },
               include: {
                 role: true,
