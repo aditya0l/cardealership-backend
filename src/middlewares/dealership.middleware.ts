@@ -4,7 +4,7 @@ import { RoleName } from '@prisma/client';
 import prisma from '../config/db';
 
 export interface DealershipRequest extends AuthenticatedRequest {
-  dealershipId?: string;
+  dealershipId?: string | null;
   isSystemAdmin: boolean;
 }
 
