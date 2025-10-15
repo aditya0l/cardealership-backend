@@ -206,7 +206,7 @@ export const authenticate = async (
             
             console.log(`✅ Auto-created ADMIN user (retry): ${user.email}`);
             
-          } catch (retryError) {
+          } catch (retryError: any) {
             console.error('❌ Retry also failed:', retryError);
             res.status(503).json({
               success: false,
@@ -307,7 +307,7 @@ export const authenticate = async (
         } catch (claimsError) {
           console.warn('⚠️ Failed to set custom claims, continuing...', claimsError);
         }
-      } catch (createError) {
+      } catch (createError: any) {
         console.error('❌ Error auto-creating user:', createError);
         res.status(500).json({
           success: false,
