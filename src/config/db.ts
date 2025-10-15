@@ -9,7 +9,14 @@ declare global {
 let prisma: PrismaClient;
 
 if (config.nodeEnv === 'production') {
-  prisma = new PrismaClient();
+  prisma = new PrismaClient({
+    log: ['error', 'warn'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL
+      }
+    }
+  });
 } else {
   if (!global.__db__) {
     global.__db__ = new PrismaClient({

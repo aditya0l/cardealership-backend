@@ -127,17 +127,101 @@ export const authenticate = async (
       }
     });
 
-    // TEMPORARILY DISABLED: Auto-create causing network issues
-    // TODO: Re-enable once database connection is stable
+    // AUTO-CREATE: Create user with ADMIN role if they don't exist
     if (!user) {
-      console.error(`❌ User not found in database: ${email || uid}`);
-      console.error('   Auto-create temporarily disabled due to network issues');
-      res.status(403).json({
-        success: false,
-        message: 'User account not found. Please contact administrator to create your account.',
-        code: 'USER_NOT_FOUND'
-      });
-      return;
+      console.log(`🆕 Auto-creating new user: ${email || uid}`);
+      
+      try {
+        // Ensure database connection is healthy
+        await prisma.$queryRaw`SELECT 1`;
+        
+        // Get ADMIN role
+        const adminRole = await prisma.role.findUnique({
+          where: { name: RoleName.ADMIN }
+        });
+        
+        if (!adminRole) {
+          console.error('❌ ADMIN role not found in database');
+          res.status(500).json({
+            success: false,
+            message: 'System configuration error: ADMIN role not found'
+          });
+          return;
+        }
+        
+        // Create user with ADMIN role (no dealership initially)
+        user = await prisma.user.create({
+          data: {
+            firebaseUid: uid,
+            email: email || `${uid}@firebase.user`,
+            name: name || email?.split('@')[0] || 'New Admin',
+            roleId: adminRole.id,
+            isActive: true,
+            employeeId: `ADM_${Date.now()}`,
+            dealershipId: null // No dealership initially - they can create one
+          },
+          include: {
+            role: true,
+            dealership: true
+          }
+        });
+        
+        console.log(`✅ Auto-created ADMIN user: ${user.email}`);
+        
+      } catch (createError) {
+        console.error('❌ Failed to auto-create user:', createError);
+        
+        // Check if it's a connection issue
+        if (createError.message?.includes('connection') || 
+            createError.message?.includes('network') ||
+            createError.message?.includes('timeout') ||
+            createError.code === 'P1001') {
+          console.log('🔄 Database connection issue - retrying once...');
+          
+          try {
+            // Wait a moment and retry once
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await prisma.$queryRaw`SELECT 1`;
+            
+            // Retry user creation
+            const adminRole = await prisma.role.findUnique({
+              where: { name: RoleName.ADMIN }
+            });
+            
+            user = await prisma.user.create({
+              data: {
+                firebaseUid: uid,
+                email: email || `${uid}@firebase.user`,
+                name: name || email?.split('@')[0] || 'New Admin',
+                roleId: adminRole!.id,
+                isActive: true,
+                employeeId: `ADM_${Date.now()}`,
+                dealershipId: null
+              },
+              include: {
+                role: true,
+                dealership: true
+              }
+            });
+            
+            console.log(`✅ Auto-created ADMIN user (retry): ${user.email}`);
+            
+          } catch (retryError) {
+            console.error('❌ Retry also failed:', retryError);
+            res.status(503).json({
+              success: false,
+              message: 'Database temporarily unavailable. Please try again in a few moments.'
+            });
+            return;
+          }
+        } else {
+          res.status(500).json({
+            success: false,
+            message: 'Failed to create user account. Please contact administrator.'
+          });
+          return;
+        }
+      }
     }
     
     /* DISABLED AUTO-CREATE in multi-tenant mode
