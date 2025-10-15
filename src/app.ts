@@ -71,6 +71,7 @@ app.use(cors({
       'https://automotive-dashboard.vercel.app',
       'https://automotive-dashboard-git-main.vercel.app',
       'https://automotive-dashboard-git-develop.vercel.app',
+      'https://automotive-dashboard-oj2u7m0ix-nrng2025001s-projects.vercel.app',
       // Wildcard for all Vercel deployments (temporary - replace with specific URL)
       /^https:\/\/.*\.vercel\.app$/,
       // Netlify domains
