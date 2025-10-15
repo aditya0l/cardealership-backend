@@ -41,6 +41,11 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
     throw createError('Name, code, type, email, phone, address, city, state, and pincode are required', 400);
   }
 
+  // ONE ADMIN = ONE DEALERSHIP: Prevent admins from creating multiple dealerships
+  if (req.user.role.name === RoleName.ADMIN && req.user.dealershipId) {
+    throw createError('You can only manage one dealership. You are already assigned to a dealership.', 403);
+  }
+
   // Check if code already exists
   const existing = await prisma.dealership.findUnique({
     where: { code }
@@ -100,12 +105,8 @@ export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, 
   if (req.user.dealershipId) {
     // User has dealership - filter by their dealership
     where.id = req.user.dealershipId;
-  } else if (req.user.role.name === RoleName.ADMIN) {
-    // New admin without dealership - show all dealerships so they can choose/join one
-    console.log(`🆕 New ADMIN viewing all dealerships: ${req.user.email}`);
-    // Don't filter - show all dealerships
   } else {
-    // Non-admin without dealership - return empty
+    // User without dealership - return empty (including new admins)
     res.json({
       success: true,
       message: 'No dealership assigned',
