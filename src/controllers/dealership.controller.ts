@@ -96,22 +96,24 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
   });
 
   // Clean up: If admin was in default dealership, check if it's now empty
-  const currentDealership = await prisma.dealership.findUnique({
-    where: { id: req.user.dealershipId },
-    select: { name: true, code: true }
-  });
-  
-  if (currentDealership?.name === 'Default Dealership' || currentDealership?.code === 'DEFAULT001') {
-    const usersInDefaultDealership = await prisma.user.count({
-      where: { dealershipId: req.user.dealershipId }
+  if (req.user.dealershipId) {
+    const currentDealership = await prisma.dealership.findUnique({
+      where: { id: req.user.dealershipId },
+      select: { name: true, code: true }
     });
     
-    if (usersInDefaultDealership === 0) {
-      // Delete empty default dealership
-      await prisma.dealership.delete({
-        where: { id: req.user.dealershipId }
+    if (currentDealership?.name === 'Default Dealership' || currentDealership?.code === 'DEFAULT001') {
+      const usersInDefaultDealership = await prisma.user.count({
+        where: { dealershipId: req.user.dealershipId }
       });
-      console.log('🗑️ Deleted empty default dealership');
+      
+      if (usersInDefaultDealership === 0) {
+        // Delete empty default dealership
+        await prisma.dealership.delete({
+          where: { id: req.user.dealershipId }
+        });
+        console.log('🗑️ Deleted empty default dealership');
+      }
     }
   }
 
