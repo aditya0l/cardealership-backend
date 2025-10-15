@@ -64,15 +64,34 @@ app.use(cors({
       'http://localhost:8081',      // Expo mobile dev
       'https://localhost:3000',
       'https://localhost:5173',
-      // Production frontend URLs (update these with your actual domains)
+      // Production frontend URLs
       'https://your-react-dashboard.vercel.app',
       'https://your-react-dashboard.netlify.app',
+      // Vercel domains (add your specific Vercel URL)
+      'https://automotive-dashboard.vercel.app',
+      'https://automotive-dashboard-git-main.vercel.app',
+      'https://automotive-dashboard-git-develop.vercel.app',
+      // Wildcard for all Vercel deployments (temporary - replace with specific URL)
+      /^https:\/\/.*\.vercel\.app$/,
+      // Netlify domains
+      /^https:\/\/.*\.netlify\.app$/,
       // Add your deployed frontend URLs here after deployment
     ];
     
-    if (allowedOrigins.includes(origin)) {
+    // Check if origin matches any allowed origin (string or regex)
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+
+    if (isAllowed) {
       callback(null, true);
     } else {
+      console.log(`CORS blocked origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
