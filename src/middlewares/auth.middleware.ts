@@ -89,7 +89,7 @@ export const authenticate = async (
           setTimeout(() => reject(new Error('Firebase token verification timeout')), 5000)
         )
       ]) as any;
-    } catch (error) {
+    } catch (error: any) {
       // If ID token verification fails, try custom token approach for testing
       if (process.env.NODE_ENV === 'development') {
         try {
@@ -108,7 +108,7 @@ export const authenticate = async (
           } else {
             throw new Error('Invalid custom token structure');
           }
-        } catch (customTokenError) {
+        } catch (customTokenError: any) {
           throw error; // Re-throw original ID token error
         }
       } else {
@@ -304,7 +304,7 @@ export const authenticate = async (
             roleId: user.role.id,
             employeeId: employeeId
           });
-        } catch (claimsError) {
+        } catch (claimsError: any) {
           console.warn('⚠️ Failed to set custom claims, continuing...', claimsError);
         }
       } catch (createError: any) {
@@ -345,7 +345,7 @@ export const authenticate = async (
     };
 
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Authentication error:', error);
     res.status(401).json({
       success: false,
@@ -383,7 +383,7 @@ export const setUserClaims = async (firebaseUid: string, claims: Record<string, 
   try {
     await auth.setCustomUserClaims(firebaseUid, claims);
     return true;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error setting custom claims:', error);
     return false;
   }
