@@ -127,53 +127,17 @@ export const authenticate = async (
       }
     });
 
-    // AUTO-CREATE: If user doesn't exist, create them with default ADMIN role
+    // TEMPORARILY DISABLED: Auto-create causing network issues
+    // TODO: Re-enable once database connection is stable
     if (!user) {
-      console.log(`🆕 Auto-creating new user: ${email || uid}`);
-      
-      try {
-        // Get ADMIN role
-        const adminRole = await prisma.role.findUnique({
-          where: { name: RoleName.ADMIN }
-        });
-        
-        if (!adminRole) {
-          console.error('❌ ADMIN role not found in database');
-          res.status(500).json({
-            success: false,
-            message: 'System configuration error: ADMIN role not found'
-          });
-          return;
-        }
-        
-        // Create user with ADMIN role
-        user = await prisma.user.create({
-          data: {
-            firebaseUid: uid,
-            email: email || '',
-            name: name || email?.split('@')[0] || 'New Admin',
-            roleId: adminRole.id,
-            isActive: true,
-            employeeId: `ADM_${Date.now()}`,
-            // No dealership assigned initially - they can create/choose one
-            dealershipId: null
-          },
-          include: {
-            role: true,
-            dealership: true
-          }
-        });
-        
-        console.log(`✅ Auto-created ADMIN user: ${user.email}`);
-        
-      } catch (createError) {
-        console.error('❌ Failed to auto-create user:', createError);
-        res.status(500).json({
-          success: false,
-          message: 'Failed to create user account'
-        });
-        return;
-      }
+      console.error(`❌ User not found in database: ${email || uid}`);
+      console.error('   Auto-create temporarily disabled due to network issues');
+      res.status(403).json({
+        success: false,
+        message: 'User account not found. Please contact administrator to create your account.',
+        code: 'USER_NOT_FOUND'
+      });
+      return;
     }
     
     /* DISABLED AUTO-CREATE in multi-tenant mode
