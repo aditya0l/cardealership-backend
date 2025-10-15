@@ -305,7 +305,8 @@ export class BookingImportService {
   static async processBatch(
     rows: BookingImportRow[],
     importId: string,
-    startIndex: number
+    startIndex: number,
+    adminDealershipId?: string
   ): Promise<{ successful: number; failed: number; errors: any[] }> {
     let successful = 0;
     let failed = 0;
@@ -371,6 +372,7 @@ export class BookingImportService {
             region: row.region,
             dealerCode: row.dealer_code,
             dealerId: dealer.id,
+            dealershipId: adminDealershipId, // CRITICAL: Set dealership for multi-tenant isolation
             
             // Customer Information
             optyId: row.opty_id,

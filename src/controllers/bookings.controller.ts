@@ -161,9 +161,7 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   // CRITICAL: Filter by dealership for multi-tenant isolation
   if (user.dealershipId) {
-    where.enquiry = {
-      dealershipId: user.dealershipId
-    };
+    where.dealershipId = user.dealershipId;
   }
 
   // Customer Advisors can only see their own bookings

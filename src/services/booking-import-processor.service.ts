@@ -19,6 +19,16 @@ export class BookingImportProcessor {
   static async processImportJob(job: any) {
     const { importId, filePath, adminId, importSettings } = job.data;
     
+    // Get admin's dealership ID for multi-tenant isolation
+    const admin = await prisma.user.findUnique({
+      where: { firebaseUid: adminId },
+      select: { dealershipId: true }
+    });
+    
+    if (!admin?.dealershipId) {
+      throw new Error('Admin must be assigned to a dealership to import bookings');
+    }
+    
     console.log(`Processing import job ${job.id} for import ${importId}`);
 
     try {
@@ -63,7 +73,7 @@ export class BookingImportProcessor {
 
       for (let i = 0; i < validRows.length; i += this.BATCH_SIZE) {
         const batch = validRows.slice(i, i + this.BATCH_SIZE);
-        const batchResult = await BookingImportService.processBatch(batch, importId, i);
+        const batchResult = await BookingImportService.processBatch(batch, importId, i, admin.dealershipId);
         
         totalProcessed += batch.length;
         totalSuccessful += batchResult.successful;
