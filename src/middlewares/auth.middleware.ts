@@ -168,14 +168,14 @@ export const authenticate = async (
         
         console.log(`✅ Auto-created ADMIN user: ${user.email}`);
         
-      } catch (createError) {
+      } catch (createError: any) {
         console.error('❌ Failed to auto-create user:', createError);
         
         // Check if it's a connection issue
-        if (createError.message?.includes('connection') || 
-            createError.message?.includes('network') ||
-            createError.message?.includes('timeout') ||
-            createError.code === 'P1001') {
+        if (createError?.message?.includes('connection') || 
+            createError?.message?.includes('network') ||
+            createError?.message?.includes('timeout') ||
+            createError?.code === 'P1001') {
           console.log('🔄 Database connection issue - retrying once...');
           
           try {
