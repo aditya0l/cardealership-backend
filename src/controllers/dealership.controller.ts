@@ -42,8 +42,23 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
   }
 
   // ONE ADMIN = ONE DEALERSHIP: Prevent admins from creating multiple dealerships
+  // BUT: Allow new admins to create their own dealership if they're in a default one
   if (req.user.role.name === RoleName.ADMIN && req.user.dealershipId) {
-    throw createError('You can only manage one dealership. You are already assigned to a dealership.', 403);
+    // Check if admin is in a default dealership (auto-assigned)
+    const currentDealership = await prisma.dealership.findUnique({
+      where: { id: req.user.dealershipId },
+      select: { name: true, code: true }
+    });
+    
+    // Allow creating new dealership only if currently in default dealership
+    const isDefaultDealership = currentDealership?.name === 'Default Dealership' || 
+                               currentDealership?.code === 'DEFAULT001';
+    
+    if (!isDefaultDealership) {
+      throw createError('You can only manage one dealership. You are already assigned to a dealership.', 403);
+    }
+    
+    console.log(`🔄 Admin creating own dealership - will be moved from default: ${currentDealership?.name}`);
   }
 
   // Check if code already exists
@@ -79,6 +94,26 @@ export const createDealership = asyncHandler(async (req: AuthenticatedRequest, r
     where: { firebaseUid: req.user.firebaseUid },
     data: { dealershipId: dealership.id }
   });
+
+  // Clean up: If admin was in default dealership, check if it's now empty
+  const currentDealership = await prisma.dealership.findUnique({
+    where: { id: req.user.dealershipId },
+    select: { name: true, code: true }
+  });
+  
+  if (currentDealership?.name === 'Default Dealership' || currentDealership?.code === 'DEFAULT001') {
+    const usersInDefaultDealership = await prisma.user.count({
+      where: { dealershipId: req.user.dealershipId }
+    });
+    
+    if (usersInDefaultDealership === 0) {
+      // Delete empty default dealership
+      await prisma.dealership.delete({
+        where: { id: req.user.dealershipId }
+      });
+      console.log('🗑️ Deleted empty default dealership');
+    }
+  }
 
   res.status(201).json({
     success: true,
