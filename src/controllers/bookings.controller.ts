@@ -159,6 +159,13 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
     where.status = status;
   }
 
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  if (user.dealershipId) {
+    where.enquiry = {
+      dealershipId: user.dealershipId
+    };
+  }
+
   // Customer Advisors can only see their own bookings
   if (user.role.name === RoleName.CUSTOMER_ADVISOR) {
     where.advisorId = user.firebaseUid;

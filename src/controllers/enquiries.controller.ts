@@ -170,6 +170,11 @@ export const getEnquiries = asyncHandler(async (req: AuthenticatedRequest, res: 
     where.category = category;
   }
 
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  if (user.dealershipId) {
+    where.dealershipId = user.dealershipId;
+  }
+
   // CUSTOMER_ADVISOR can only see enquiries they created
   if (user.role.name === 'CUSTOMER_ADVISOR') {
     where.createdByUserId = user.firebaseUid;

@@ -509,21 +509,30 @@ export const resetUserPassword = asyncHandler(async (req: AuthenticatedRequest, 
   }
 });
 
-export const getAllUsers = asyncHandler(async (req: Request, res: Response) => {
+export const getAllUsers = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
   const page = parseInt(req.query.page as string) || 1;
   const limit = parseInt(req.query.limit as string) || 10;
   const skip = (page - 1) * limit;
 
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  const where: any = {};
+  if (user.dealershipId) {
+    where.dealershipId = user.dealershipId;
+  }
+
   const [users, total] = await Promise.all([
     prisma.user.findMany({
+      where,
       skip,
       take: limit,
       include: {
-        role: true
+        role: true,
+        dealership: true
       },
       orderBy: { createdAt: 'desc' }
     }),
-    prisma.user.count()
+    prisma.user.count({ where })
   ]);
 
   res.json({
