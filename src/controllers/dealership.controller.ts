@@ -97,8 +97,15 @@ export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, 
   const where: any = {};
   
   // MULTI-TENANT: Filter by user's dealership
-  if (!req.user.dealershipId) {
-    // User has no dealership - return empty
+  if (req.user.dealershipId) {
+    // User has dealership - filter by their dealership
+    where.id = req.user.dealershipId;
+  } else if (req.user.role.name === RoleName.ADMIN) {
+    // New admin without dealership - show all dealerships so they can choose/join one
+    console.log(`🆕 New ADMIN viewing all dealerships: ${req.user.email}`);
+    // Don't filter - show all dealerships
+  } else {
+    // Non-admin without dealership - return empty
     res.json({
       success: true,
       message: 'No dealership assigned',
@@ -109,8 +116,6 @@ export const getAllDealerships = asyncHandler(async (req: AuthenticatedRequest, 
     });
     return;
   }
-  
-  where.id = req.user.dealershipId;
   
   if (type) where.type = type;
   if (isActive !== undefined) where.isActive = isActive;

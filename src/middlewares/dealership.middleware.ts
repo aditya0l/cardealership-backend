@@ -25,17 +25,22 @@ export const dealershipContext = async (
     // ALL users (including ADMIN) belong to one dealership
     dealershipReq.isSystemAdmin = false;
 
-    // ALL users must have a dealership assigned
+    // For new admins without dealership, allow them to proceed (they can create/choose one)
     if (!authenticatedReq.user.dealershipId) {
-      res.status(403).json({
-        success: false,
-        message: 'User must be associated with a dealership. Please contact administrator.'
-      });
-      return;
+      if (authenticatedReq.user.role.name === RoleName.ADMIN) {
+        console.log(`🆕 New ADMIN user without dealership: ${authenticatedReq.user.email}`);
+        dealershipReq.dealershipId = null; // Allow null for new admins
+      } else {
+        res.status(403).json({
+          success: false,
+          message: 'User must be associated with a dealership. Please contact administrator.'
+        });
+        return;
+      }
+    } else {
+      // Set dealership context from user (including ADMINs)
+      dealershipReq.dealershipId = authenticatedReq.user.dealershipId;
     }
-
-    // Set dealership context from user (including ADMINs)
-    dealershipReq.dealershipId = authenticatedReq.user.dealershipId;
 
     next();
   } catch (error) {
