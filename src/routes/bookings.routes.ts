@@ -19,6 +19,10 @@ import {
   getImportById,
   downloadImportErrors,
   assignAdvisor,
+  bulkAssignAdvisor,
+  unassignAdvisor,
+  autoAssignBookings,
+  generateExcelTemplate,
   updateBookingStatus
 } from '../controllers/booking-import.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
@@ -43,6 +47,12 @@ router.post('/import/upload',
 router.post('/import/preview', 
   authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]), 
   previewImportFile
+);
+
+// 🆕 Generate Excel template with advisor IDs
+router.get('/import/template', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  generateExcelTemplate
 );
 
 router.get('/imports', 
@@ -70,6 +80,24 @@ router.post('/',
 router.patch('/:id/assign', 
   authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER, RoleName.TEAM_LEAD]), 
   assignAdvisor
+);
+
+// 🆕 Bulk assign multiple bookings to one advisor
+router.post('/bulk-assign', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER, RoleName.TEAM_LEAD]), 
+  bulkAssignAdvisor
+);
+
+// 🆕 Unassign advisor from booking
+router.patch('/:id/unassign', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER, RoleName.TEAM_LEAD]), 
+  unassignAdvisor
+);
+
+// 🆕 Auto-assign bookings using different strategies (round-robin, least-load, random)
+router.post('/auto-assign', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  autoAssignBookings
 );
 
 // =============================================================================
