@@ -157,7 +157,7 @@ export const updateModel = asyncHandler(async (req: AuthenticatedRequest, res: R
   const { id } = req.params;
   const user = req.user;
 
-  if (!canPerformAction(user.role.name, 'update', 'booking')) {
+  if (user.role.name !== RoleName.ADMIN && user.role.name !== RoleName.GENERAL_MANAGER) {
     throw createError('Insufficient permissions to update models', 403);
   }
 
@@ -204,7 +204,7 @@ export const deleteModel = asyncHandler(async (req: AuthenticatedRequest, res: R
   const { id } = req.params;
   const user = req.user;
 
-  if (!canPerformAction(user.role.name, 'delete', 'booking')) {
+  if (user.role.name !== RoleName.ADMIN) {
     throw createError('Insufficient permissions to delete models', 403);
   }
 
