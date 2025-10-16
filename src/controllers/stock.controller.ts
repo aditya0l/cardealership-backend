@@ -34,8 +34,8 @@ interface UpdateVehicleRequest {
 export const createVehicle = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   
-  // Check if user can create vehicles
-  if (!canPerformAction(user.role.name, 'create', 'booking')) { // Using booking permissions as proxy for vehicle management
+  // Check if user can create vehicles - Admin and General Manager can create vehicles
+  if (user.role.name !== RoleName.ADMIN && user.role.name !== RoleName.GENERAL_MANAGER) {
     throw createError('Insufficient permissions to create vehicles', 403);
   }
 

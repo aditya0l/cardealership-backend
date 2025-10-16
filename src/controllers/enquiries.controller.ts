@@ -122,7 +122,8 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
       assignedToUserId,
       createdByUserId: req.user.firebaseUid,
       category: category || EnquiryCategory.HOT,  // Default to HOT
-      dealerCode: dealerCode || 'DEFAULT001'  // Default dealer if not provided
+      dealerCode: dealerCode || 'DEFAULT001',  // Default dealer if not provided
+      dealershipId: req.user.dealershipId  // CRITICAL: Assign to user's dealership
     },
     include: {
       assignedTo: {

@@ -2,7 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { canPerformAction } from '../middlewares/rbac.middleware';
+import { RoleName } from '@prisma/client';
 
 interface CreateModelRequest {
   brand: string;
@@ -28,7 +28,7 @@ export const createModel = asyncHandler(async (req: AuthenticatedRequest, res: R
   const user = req.user;
   
   // Only Admin and General Manager can create models
-  if (!canPerformAction(user.role.name, 'create', 'booking')) {
+  if (user.role.name !== RoleName.ADMIN && user.role.name !== RoleName.GENERAL_MANAGER) {
     throw createError('Insufficient permissions to create models', 403);
   }
 
