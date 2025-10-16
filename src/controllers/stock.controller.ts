@@ -63,7 +63,8 @@ export const createVehicle = asyncHandler(async (req: AuthenticatedRequest, res:
       rasStock,
       regionalStock,
       plantStock,
-      totalStock
+      totalStock,
+      dealershipId: user.dealershipId // CRITICAL: Assign to user's dealership
     },
     include: {
       dealer: true,
@@ -95,6 +96,11 @@ export const getVehicles = asyncHandler(async (req: AuthenticatedRequest, res: R
   const skip = (page - 1) * limit;
   
   const where: any = { isActive: true };
+  
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  if (user.dealershipId) {
+    where.dealershipId = user.dealershipId;
+  }
   
   // Dealer-specific filtering
   if (dealerId) {

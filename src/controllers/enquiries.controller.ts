@@ -484,10 +484,18 @@ export const deleteEnquiry = asyncHandler(async (req: Request, res: Response) =>
 });
 
 // Helper functions for dropdowns
-export const getAvailableModels = asyncHandler(async (req: Request, res: Response) => {
+export const getAvailableModels = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  const where: any = { isActive: true };
+  if (user.dealershipId) {
+    where.dealershipId = user.dealershipId;
+  }
+  
   // Get unique vehicle models/variants from the Vehicle table
   const vehicles = await prisma.vehicle.findMany({
-    where: { isActive: true },
+    where,
     select: {
       variant: true,
       dealerType: true
@@ -516,10 +524,16 @@ export const getAvailableModels = asyncHandler(async (req: Request, res: Respons
   });
 });
 
-export const getAvailableVariants = asyncHandler(async (req: Request, res: Response) => {
+export const getAvailableVariants = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
   const { model } = req.query;
 
   let where: any = { isActive: true };
+  
+  // CRITICAL: Filter by dealership for multi-tenant isolation
+  if (user.dealershipId) {
+    where.dealershipId = user.dealershipId;
+  }
   
   if (model) {
     where.variant = { contains: model as string, mode: 'insensitive' };
