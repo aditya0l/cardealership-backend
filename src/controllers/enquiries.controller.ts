@@ -594,13 +594,22 @@ export const getEnquirySources = asyncHandler(async (req: Request, res: Response
   });
 });
 
-export const getEnquiryStats = asyncHandler(async (req: Request, res: Response) => {
+export const getEnquiryStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  
+  // Build dealership filter
+  const dealershipFilter: any = {};
+  if (user.dealershipId) {
+    dealershipFilter.dealershipId = user.dealershipId;
+  }
+
   // Get total enquiries count
-  const totalEnquiries = await prisma.enquiry.count();
+  const totalEnquiries = await prisma.enquiry.count({ where: dealershipFilter });
 
   // Get enquiries by status
   const enquiriesByStatus = await prisma.enquiry.groupBy({
     by: ['status'],
+    where: dealershipFilter,
     _count: {
       id: true
     }
@@ -609,6 +618,7 @@ export const getEnquiryStats = asyncHandler(async (req: Request, res: Response) 
   // Get enquiries by source
   const enquiriesBySource = await prisma.enquiry.groupBy({
     by: ['source'],
+    where: dealershipFilter,
     _count: {
       id: true
     }
@@ -620,6 +630,7 @@ export const getEnquiryStats = asyncHandler(async (req: Request, res: Response) 
   
   const recentEnquiries = await prisma.enquiry.count({
     where: {
+      ...dealershipFilter,
       createdAt: {
         gte: thirtyDaysAgo
       }
@@ -630,6 +641,7 @@ export const getEnquiryStats = asyncHandler(async (req: Request, res: Response) 
   const popularModels = await prisma.enquiry.groupBy({
     by: ['model'],
     where: {
+      ...dealershipFilter,
       model: {
         not: null
       }

@@ -138,10 +138,17 @@ export const getRecentActivities = asyncHandler(async (req: AuthenticatedRequest
   const user = req.user;
   const limit = parseInt(req.query.limit as string) || 10;
   
+  // Build dealership filter
+  const dealershipFilter: any = {};
+  if (user.dealershipId) {
+    dealershipFilter.dealershipId = user.dealershipId;
+  }
+  
   try {
-    // Fetch recent items from each entity
+    // Fetch recent items from each entity with dealership filtering
     const [recentBookings, recentEnquiries, recentQuotations] = await Promise.all([
       prisma.booking.findMany({
+        where: dealershipFilter,
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -153,6 +160,7 @@ export const getRecentActivities = asyncHandler(async (req: AuthenticatedRequest
         }
       }),
       prisma.enquiry.findMany({
+        where: dealershipFilter,
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -164,6 +172,7 @@ export const getRecentActivities = asyncHandler(async (req: AuthenticatedRequest
         }
       }),
       prisma.quotation.findMany({
+        where: dealershipFilter,
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -229,8 +238,26 @@ export const getRecentActivities = asyncHandler(async (req: AuthenticatedRequest
 export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   
+  // Build dealership filter
+  const dealershipFilter: any = {};
+  if (user.dealershipId) {
+    dealershipFilter.dealershipId = user.dealershipId;
+  }
+  
+  // Build user filter (users in same dealership)
+  const userFilter: any = { isActive: true };
+  if (user.dealershipId) {
+    userFilter.dealershipId = user.dealershipId;
+  }
+  
+  // Build vehicle filter (vehicles in same dealership)
+  const vehicleFilter: any = { isActive: true };
+  if (user.dealershipId) {
+    vehicleFilter.dealershipId = user.dealershipId;
+  }
+  
   try {
-    // Fetch all stats in parallel
+    // Fetch all stats in parallel with dealership filtering
     const [
       totalBookings,
       totalEnquiries,
@@ -240,21 +267,23 @@ export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, 
       enquiryStats,
       quotationStats
     ] = await Promise.all([
-      prisma.booking.count(),
-      prisma.enquiry.count(),
-      prisma.quotation.count(),
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.vehicle.count({ where: { isActive: true } }),
+      prisma.booking.count({ where: dealershipFilter }),
+      prisma.enquiry.count({ where: dealershipFilter }),
+      prisma.quotation.count({ where: dealershipFilter }),
+      prisma.user.count({ where: userFilter }),
+      prisma.vehicle.count({ where: vehicleFilter }),
       
       // Enquiry stats by category and status
       prisma.enquiry.groupBy({
         by: ['category', 'status'],
+        where: dealershipFilter,
         _count: true
       }),
       
       // Quotation stats by status
       prisma.quotation.groupBy({
         by: ['status'],
+        where: dealershipFilter,
         _count: true
       })
     ]);
