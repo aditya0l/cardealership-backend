@@ -418,7 +418,8 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
           expectedDeliveryDate: enquiry.expectedBookingDate,
           stockAvailability: stockInfo ? 'VEHICLE_AVAILABLE' : undefined,  // Set stock status
           backOrderStatus: false,  // Not a back order since stock is available
-          remarks: `Auto-created from enquiry: ${enquiry.id}. ${enquiry.caRemarks || ''}${stockInfo ? '\nStock validated: Vehicle available in inventory.' : ''}`
+          remarks: `Auto-created from enquiry: ${enquiry.id}. ${enquiry.caRemarks || ''}${stockInfo ? '\nStock validated: Vehicle available in inventory.' : ''}`,
+          dealershipId: enquiry.dealershipId  // CRITICAL: Inherit dealership from enquiry
         },
         include: {
           enquiry: {

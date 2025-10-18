@@ -402,7 +402,8 @@ export const createBooking = asyncHandler(async (req: Request, res: Response) =>
       bookingDate: bookingDate ? new Date(bookingDate) : null,
       enquiryId,
       source: BookingSource.MANUAL,
-      metadata: metadata || {}
+      metadata: metadata || {},
+      dealershipId: user.dealershipId  // CRITICAL: Assign to user's dealership
     },
     include: {
       enquiry: {

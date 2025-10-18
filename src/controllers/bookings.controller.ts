@@ -104,7 +104,8 @@ export const createBooking = asyncHandler(async (req: AuthenticatedRequest, res:
   const bookingData = {
     ...filteredData,
     source: BookingSource.MANUAL,
-    status: BookingStatus.PENDING
+    status: BookingStatus.PENDING,
+    dealershipId: req.user.dealershipId  // CRITICAL: Assign to user's dealership
   };
 
   try {
