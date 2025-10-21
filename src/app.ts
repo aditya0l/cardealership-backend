@@ -14,6 +14,7 @@ import dashboardRoutes from './routes/dashboard.routes';
 import modelRoutes from './routes/model.routes';
 import dealershipRoutes from './routes/dealership.routes'; // Multi-tenant dealership system
 import notificationRoutes from './routes/notification.routes'; // FCM notification management
+import remarkRoutes from './routes/remark.routes'; // Date-wise remarks and status tracking
 
 // Import middleware
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
@@ -137,6 +138,7 @@ app.use('/api/models', modelRoutes); // Model master data management
 app.use('/api/dashboard', dashboardRoutes); // Dashboard analytics endpoints
 app.use('/api/dealerships', dealershipRoutes); // Multi-tenant dealership system
 app.use('/api/notifications', notificationRoutes); // FCM notification management
+app.use('/api/remarks', remarkRoutes); // Date-wise remarks and status tracking
 
 // Catch 404 and forward to error handler
 app.use(notFoundHandler);

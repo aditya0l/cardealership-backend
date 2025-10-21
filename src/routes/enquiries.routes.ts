@@ -9,7 +9,8 @@ import {
   getAvailableVariants,
   getAvailableColors,
   getEnquirySources,
-  getEnquiryStats
+  getEnquiryStats,
+  getEnquiriesWithRemarks
 } from '../controllers/enquiries.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
@@ -33,6 +34,9 @@ router.post('/', createEnquiry);
 
 // Get all enquiries - All authenticated users can view
 router.get('/', getEnquiries);
+
+// Get enquiries with remarks history - All authenticated users can view
+router.get('/with-remarks', getEnquiriesWithRemarks);
 
 // Get enquiry by ID - All authenticated users can view
 router.get('/:id', getEnquiryById);

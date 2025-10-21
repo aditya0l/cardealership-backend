@@ -679,3 +679,87 @@ export const getEnquiryStats = asyncHandler(async (req: AuthenticatedRequest, re
     }
   });
 });
+
+// Get enquiries with remarks history
+export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { page = 1, limit = 10, status, category, assignedToUserId, startDate, endDate } = req.query;
+  const user = req.user;
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  // Build where clause with dealership filtering
+  const where: any = {
+    dealershipId: user.dealershipId
+  };
+
+  if (status) where.status = status;
+  if (category) where.category = category;
+  if (assignedToUserId) where.assignedToUserId = assignedToUserId;
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+
+  const [enquiries, total] = await Promise.all([
+    prisma.enquiry.findMany({
+      where,
+      include: {
+        createdBy: {
+          select: {
+            firebaseUid: true,
+            name: true,
+            email: true
+          }
+        },
+        assignedTo: {
+          select: {
+            firebaseUid: true,
+            name: true,
+            email: true
+          }
+        },
+        remarkHistory: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                role: {
+                  select: { name: true }
+                }
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5 // Latest 5 remarks
+        },
+        _count: {
+          select: {
+            bookings: true,
+            quotations: true
+          }
+        }
+      },
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take: Number(limit)
+    }),
+    prisma.enquiry.count({ where })
+  ]);
+
+  res.json({
+    success: true,
+    message: 'Enquiries with remarks retrieved successfully',
+    data: {
+      enquiries,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit))
+      }
+    }
+  });
+});

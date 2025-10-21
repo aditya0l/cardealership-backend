@@ -9,7 +9,8 @@ import {
   getAdvisorBookings,
   addBookingRemark,
   getBookingAuditLog,
-  updateBookingStatusAndFields
+  updateBookingStatusAndFields,
+  getBookingsWithRemarks
 } from '../controllers/bookings.controller';
 import {
   // Admin import endpoints from booking-import controller
@@ -130,6 +131,9 @@ router.put('/:id/update-status',
 
 // Get all bookings with enhanced filtering - all authenticated users can read with appropriate filtering
 router.get('/', getBookings);
+
+// Get bookings with remarks history - all authenticated users can read with appropriate filtering
+router.get('/with-remarks', getBookingsWithRemarks);
 
 // Get booking by ID with full details - all authenticated users can read with appropriate filtering  
 router.get('/:id', getBookingById);

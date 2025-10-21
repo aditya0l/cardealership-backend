@@ -956,3 +956,83 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
     throw createError('Failed to update booking', 500);
   }
 });
+
+// Get bookings with remarks history
+export const getBookingsWithRemarks = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { page = 1, limit = 10, status, advisorId, startDate, endDate } = req.query;
+  const user = req.user;
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  // Build where clause with dealership filtering
+  const where: any = {
+    dealershipId: user.dealershipId
+  };
+
+  if (status) where.status = status;
+  if (advisorId) where.advisorId = advisorId;
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+
+  const [bookings, total] = await Promise.all([
+    prisma.booking.findMany({
+      where,
+      include: {
+        advisor: {
+          select: {
+            firebaseUid: true,
+            name: true,
+            email: true,
+            role: {
+              select: { name: true }
+            }
+          }
+        },
+        enquiry: {
+          select: {
+            id: true,
+            customerName: true,
+            status: true
+          }
+        },
+        remarkHistory: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                role: {
+                  select: { name: true }
+                }
+              }
+            }
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5 // Latest 5 remarks
+        }
+      },
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take: Number(limit)
+    }),
+    prisma.booking.count({ where })
+  ]);
+
+  res.json({
+    success: true,
+    message: 'Bookings with remarks retrieved successfully',
+    data: {
+      bookings,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / Number(limit))
+      }
+    }
+  });
+});

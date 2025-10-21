@@ -39,6 +39,7 @@ model User {
   assignedEnquiries Enquiry[]         @relation("AssignedTo")
   createdEnquiries  Enquiry[]         @relation("CreatedBy")
   notificationLogs  NotificationLog[] @relation("NotificationLogs")
+  remarks           Remark[]          @relation("RemarkAuthor")
   role              Role              @relation(fields: [roleId], references: [id])
   dealership        Dealership?       @relation(fields: [dealershipId], references: [id])
   manager           User?             @relation("ManagerSubordinates", fields: [managerId], references: [firebaseUid], onDelete: SetNull)
@@ -74,6 +75,7 @@ model Enquiry {
   
   // Relations
   bookings            Booking[]
+  remarkHistory       Remark[]
   assignedTo          User?           @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
   createdBy           User            @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
   dealership          Dealership?     @relation("DealershipEnquiries", fields: [dealershipId], references: [id])
@@ -134,6 +136,7 @@ model Booking {
   
   // Relations
   auditLogs    BookingAuditLog[]
+  remarkHistory Remark[]
   advisor      User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
   dealer       Dealer?           @relation(fields: [dealerId], references: [id])
   dealership   Dealership?       @relation("DealershipBookings", fields: [dealershipId], references: [id])
@@ -436,4 +439,25 @@ model NotificationLog {
   user            User     @relation("NotificationLogs", fields: [userId], references: [firebaseUid])
   
   @@map("notification_logs")
+}
+
+model Remark {
+  id            String   @id @default(cuid())
+  entityType    String   // 'enquiry' or 'booking'
+  entityId      String   // ID of enquiry or booking
+  remark        String   // The actual remark text
+  remarkType    String   // 'status_update', 'follow_up', 'escalation', 'ca_remarks', 'tl_remarks', etc.
+  createdBy     String   // User ID who created the remark
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  user          User     @relation("RemarkAuthor", fields: [createdBy], references: [firebaseUid])
+  enquiry       Enquiry? @relation(fields: [entityId], references: [id], map: "remark_enquiry_fkey")
+  booking       Booking? @relation(fields: [entityId], references: [id], map: "remark_booking_fkey")
+  
+  @@index([entityType, entityId])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@map("remarks")
 }
