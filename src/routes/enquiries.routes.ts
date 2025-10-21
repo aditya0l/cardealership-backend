@@ -10,7 +10,9 @@ import {
   getAvailableColors,
   getEnquirySources,
   getEnquiryStats,
-  getEnquiriesWithRemarks
+  getEnquiriesWithRemarks,
+  bulkDownloadEnquiries,
+  getEnquiryStatusSummary
 } from '../controllers/enquiries.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
@@ -37,6 +39,18 @@ router.get('/', getEnquiries);
 
 // Get enquiries with remarks history - All authenticated users can view
 router.get('/with-remarks', getEnquiriesWithRemarks);
+
+// Bulk download enquiries - Admin and Manager only
+router.get('/download', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  bulkDownloadEnquiries
+);
+
+// Get enquiry status summary - Manager and Admin only
+router.get('/status-summary', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  getEnquiryStatusSummary
+);
 
 // Get enquiry by ID - All authenticated users can view
 router.get('/:id', getEnquiryById);

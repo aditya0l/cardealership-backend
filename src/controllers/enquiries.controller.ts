@@ -763,3 +763,264 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
     }
   });
 });
+
+// Bulk download enquiries as Excel file
+export const bulkDownloadEnquiries = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { status, category, startDate, endDate, format = 'excel' } = req.query;
+  const user = req.user;
+  
+  // Build where clause with dealership filtering
+  const where: any = {
+    dealershipId: user.dealershipId
+  };
+  
+  if (status) where.status = status;
+  if (category) where.category = category;
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+  
+  const enquiries = await prisma.enquiry.findMany({
+    where,
+    include: {
+      createdBy: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
+          }
+        }
+      },
+      assignedTo: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
+          }
+        }
+      },
+      _count: {
+        select: {
+          bookings: true,
+          quotations: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  
+  if (format === 'excel') {
+    const XLSX = require('xlsx');
+    
+    // Prepare data for Excel
+    const excelData = enquiries.map(enquiry => ({
+      'Enquiry ID': enquiry.id,
+      'Customer Name': enquiry.customerName,
+      'Customer Contact': enquiry.customerContact,
+      'Customer Email': enquiry.customerEmail,
+      'Status': enquiry.status,
+      'Category': enquiry.category,
+      'Model': enquiry.model || '',
+      'Variant': enquiry.variant || '',
+      'Color': enquiry.color || '',
+      'Source': enquiry.source,
+      'Dealer Code': enquiry.dealerCode || '',
+      'Expected Booking Date': enquiry.expectedBookingDate ? new Date(enquiry.expectedBookingDate).toLocaleDateString() : '',
+      'Created By': enquiry.createdBy?.name || '',
+      'Created By Email': enquiry.createdBy?.email || '',
+      'Created By Role': enquiry.createdBy?.role?.name || '',
+      'Assigned To': enquiry.assignedTo?.name || '',
+      'Assigned To Email': enquiry.assignedTo?.email || '',
+      'Assigned To Role': enquiry.assignedTo?.role?.name || '',
+      'CA Remarks': enquiry.caRemarks || '',
+      'Created At': new Date(enquiry.createdAt).toLocaleDateString(),
+      'Updated At': new Date(enquiry.updatedAt).toLocaleDateString(),
+      'Bookings Count': enquiry._count.bookings,
+      'Quotations Count': enquiry._count.quotations,
+      'Last Follow Up': enquiry.lastFollowUpDate ? new Date(enquiry.lastFollowUpDate).toLocaleDateString() : '',
+      'Follow Up Count': enquiry.followUpCount,
+      'Next Follow Up': enquiry.nextFollowUpDate ? new Date(enquiry.nextFollowUpDate).toLocaleDateString() : ''
+    }));
+    
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // Set column widths
+    const columnWidths = [
+      { wch: 15 }, // Enquiry ID
+      { wch: 20 }, // Customer Name
+      { wch: 15 }, // Customer Contact
+      { wch: 25 }, // Customer Email
+      { wch: 12 }, // Status
+      { wch: 12 }, // Category
+      { wch: 15 }, // Model
+      { wch: 15 }, // Variant
+      { wch: 12 }, // Color
+      { wch: 15 }, // Source
+      { wch: 12 }, // Dealer Code
+      { wch: 18 }, // Expected Booking Date
+      { wch: 20 }, // Created By
+      { wch: 25 }, // Created By Email
+      { wch: 15 }, // Created By Role
+      { wch: 20 }, // Assigned To
+      { wch: 25 }, // Assigned To Email
+      { wch: 15 }, // Assigned To Role
+      { wch: 30 }, // CA Remarks
+      { wch: 12 }, // Created At
+      { wch: 12 }, // Updated At
+      { wch: 15 }, // Bookings Count
+      { wch: 15 }, // Quotations Count
+      { wch: 15 }, // Last Follow Up
+      { wch: 15 }, // Follow Up Count
+      { wch: 15 }  // Next Follow Up
+    ];
+    worksheet['!cols'] = columnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Enquiries');
+    
+    // Generate Excel buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // Set response headers for Excel download
+    const filename = `enquiries_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    res.send(excelBuffer);
+  } else {
+    // Return JSON data
+    res.json({
+      success: true,
+      message: 'Enquiries data retrieved successfully',
+      data: {
+        enquiries,
+        totalCount: enquiries.length,
+        filters: {
+          status,
+          category,
+          startDate,
+          endDate
+        },
+        exportedAt: new Date().toISOString()
+      }
+    });
+  }
+});
+
+// Get enquiry status summary for dashboard
+export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  
+  // Get status summary
+  const statusSummary = await prisma.enquiry.groupBy({
+    by: ['status'],
+    where: { dealershipId: user.dealershipId },
+    _count: true,
+    orderBy: { _count: { status: 'desc' } }
+  });
+  
+  // Get category summary
+  const categorySummary = await prisma.enquiry.groupBy({
+    by: ['category'],
+    where: { dealershipId: user.dealershipId },
+    _count: true,
+    orderBy: { _count: { category: 'desc' } }
+  });
+  
+  // Get recent enquiries count (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentEnquiries = await prisma.enquiry.count({
+    where: {
+      dealershipId: user.dealershipId,
+      createdAt: { gte: sevenDaysAgo }
+    }
+  });
+  
+  // Get hot enquiries needing follow-up
+  const hotEnquiries = await prisma.enquiry.count({
+    where: {
+      dealershipId: user.dealershipId,
+      category: 'HOT',
+      status: 'OPEN'
+    }
+  });
+  
+  // Get overdue follow-ups
+  const today = new Date();
+  const overdueFollowUps = await prisma.enquiry.count({
+    where: {
+      dealershipId: user.dealershipId,
+      nextFollowUpDate: { lt: today },
+      status: 'OPEN'
+    }
+  });
+  
+  // Get source summary
+  const sourceSummary = await prisma.enquiry.groupBy({
+    by: ['source'],
+    where: { dealershipId: user.dealershipId },
+    _count: true,
+    orderBy: { _count: { source: 'desc' } }
+  });
+  
+  // Get advisor-wise summary
+  const advisorSummary = await prisma.enquiry.groupBy({
+    by: ['assignedToUserId'],
+    where: { 
+      dealershipId: user.dealershipId,
+      assignedToUserId: { not: null }
+    },
+    _count: true,
+    orderBy: { _count: { assignedToUserId: 'desc' } }
+  });
+  
+  // Get advisor names
+  const advisorDetails = await Promise.all(
+    advisorSummary.map(async (item) => {
+      const advisor = await prisma.user.findUnique({
+        where: { firebaseUid: item.assignedToUserId! },
+        select: { name: true, email: true }
+      });
+      return {
+        advisorId: item.assignedToUserId,
+        advisorName: advisor?.name || 'Unknown',
+        advisorEmail: advisor?.email || '',
+        enquiryCount: item._count
+      };
+    })
+  );
+  
+  res.json({
+    success: true,
+    message: 'Enquiry status summary retrieved successfully',
+    data: {
+      statusBreakdown: statusSummary.map(item => ({
+        status: item.status,
+        count: item._count
+      })),
+      categoryBreakdown: categorySummary.map(item => ({
+        category: item.category,
+        count: item._count
+      })),
+      sourceBreakdown: sourceSummary.map(item => ({
+        source: item.source,
+        count: item._count
+      })),
+      recentEnquiries,
+      hotEnquiries,
+      overdueFollowUps,
+      advisorBreakdown: advisorDetails,
+      totalEnquiries: statusSummary.reduce((sum, item) => sum + item._count, 0),
+      summaryDate: new Date().toISOString()
+    }
+  });
+});

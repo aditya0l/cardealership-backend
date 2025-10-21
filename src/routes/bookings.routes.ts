@@ -10,7 +10,9 @@ import {
   addBookingRemark,
   getBookingAuditLog,
   updateBookingStatusAndFields,
-  getBookingsWithRemarks
+  getBookingsWithRemarks,
+  bulkDownloadBookings,
+  getBookingStatusSummary
 } from '../controllers/bookings.controller';
 import {
   // Admin import endpoints from booking-import controller
@@ -134,6 +136,18 @@ router.get('/', getBookings);
 
 // Get bookings with remarks history - all authenticated users can read with appropriate filtering
 router.get('/with-remarks', getBookingsWithRemarks);
+
+// Bulk download bookings - Admin and Manager only
+router.get('/download', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  bulkDownloadBookings
+);
+
+// Get booking status summary - Manager and Admin only
+router.get('/status-summary', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
+  getBookingStatusSummary
+);
 
 // Get booking by ID with full details - all authenticated users can read with appropriate filtering  
 router.get('/:id', getBookingById);

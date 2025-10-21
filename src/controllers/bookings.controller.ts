@@ -1036,3 +1036,242 @@ export const getBookingsWithRemarks = asyncHandler(async (req: AuthenticatedRequ
     }
   });
 });
+
+// Bulk download bookings as Excel file
+export const bulkDownloadBookings = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { status, category, startDate, endDate, format = 'excel' } = req.query;
+  const user = req.user;
+  
+  // Build where clause with dealership filtering
+  const where: any = {
+    dealershipId: user.dealershipId
+  };
+  
+  if (status) where.status = status;
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+  
+  const bookings = await prisma.booking.findMany({
+    where,
+    include: {
+      enquiry: {
+        select: {
+          id: true,
+          customerName: true,
+          customerContact: true,
+          customerEmail: true,
+          status: true,
+          category: true,
+          source: true
+        }
+      },
+      advisor: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  
+  if (format === 'excel') {
+    const XLSX = require('xlsx');
+    
+    // Prepare data for Excel
+    const excelData = bookings.map(booking => ({
+      'Booking ID': booking.id,
+      'Customer Name': booking.customerName,
+      'Customer Phone': booking.customerPhone || '',
+      'Customer Email': booking.customerEmail || '',
+      'Status': booking.status,
+      'Variant': booking.variant || '',
+      'Color': booking.color || '',
+      'Dealer Code': booking.dealerCode,
+      'Advisor': booking.advisor?.name || '',
+      'Advisor Email': booking.advisor?.email || '',
+      'Advisor Role': booking.advisor?.role?.name || '',
+      'Booking Date': booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : '',
+      'Expected Delivery': booking.expectedDeliveryDate ? new Date(booking.expectedDeliveryDate).toLocaleDateString() : '',
+      'Finance Required': booking.financeRequired ? 'Yes' : 'No',
+      'Financer Name': booking.financerName || '',
+      'File Login Date': booking.fileLoginDate ? new Date(booking.fileLoginDate).toLocaleDateString() : '',
+      'Approval Date': booking.approvalDate ? new Date(booking.approvalDate).toLocaleDateString() : '',
+      'RTO Date': booking.rtoDate ? new Date(booking.rtoDate).toLocaleDateString() : '',
+      'Stock Availability': booking.stockAvailability || '',
+      'Back Order': booking.backOrderStatus ? 'Yes' : 'No',
+      'Source': booking.source,
+      'Created At': new Date(booking.createdAt).toLocaleDateString(),
+      'Updated At': new Date(booking.updatedAt).toLocaleDateString(),
+      'Enquiry ID': booking.enquiryId || '',
+      'Enquiry Category': booking.enquiry?.category || '',
+      'Enquiry Source': booking.enquiry?.source || '',
+      'Remarks': booking.remarks || '',
+      'Advisor Remarks': booking.advisorRemarks || '',
+      'Team Lead Remarks': booking.teamLeadRemarks || '',
+      'Sales Manager Remarks': booking.salesManagerRemarks || '',
+      'General Manager Remarks': booking.generalManagerRemarks || '',
+      'Admin Remarks': booking.adminRemarks || ''
+    }));
+    
+    // Create workbook and worksheet
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    
+    // Set column widths
+    const columnWidths = [
+      { wch: 15 }, // Booking ID
+      { wch: 20 }, // Customer Name
+      { wch: 15 }, // Customer Phone
+      { wch: 25 }, // Customer Email
+      { wch: 12 }, // Status
+      { wch: 15 }, // Variant
+      { wch: 12 }, // Color
+      { wch: 12 }, // Dealer Code
+      { wch: 20 }, // Advisor
+      { wch: 25 }, // Advisor Email
+      { wch: 15 }, // Advisor Role
+      { wch: 12 }, // Booking Date
+      { wch: 15 }, // Expected Delivery
+      { wch: 15 }, // Finance Required
+      { wch: 20 }, // Financer Name
+      { wch: 15 }, // File Login Date
+      { wch: 15 }, // Approval Date
+      { wch: 12 }, // RTO Date
+      { wch: 18 }, // Stock Availability
+      { wch: 12 }, // Back Order
+      { wch: 15 }, // Source
+      { wch: 12 }, // Created At
+      { wch: 12 }, // Updated At
+      { wch: 15 }, // Enquiry ID
+      { wch: 15 }, // Enquiry Category
+      { wch: 15 }, // Enquiry Source
+      { wch: 30 }, // Remarks
+      { wch: 30 }, // Advisor Remarks
+      { wch: 30 }, // Team Lead Remarks
+      { wch: 30 }, // Sales Manager Remarks
+      { wch: 30 }, // General Manager Remarks
+      { wch: 30 }  // Admin Remarks
+    ];
+    worksheet['!cols'] = columnWidths;
+    
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Bookings');
+    
+    // Generate Excel buffer
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // Set response headers for Excel download
+    const filename = `bookings_export_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
+    
+    res.send(excelBuffer);
+  } else {
+    // Return JSON data
+    res.json({
+      success: true,
+      message: 'Bookings data retrieved successfully',
+      data: {
+        bookings,
+        totalCount: bookings.length,
+        filters: {
+          status,
+          startDate,
+          endDate
+        },
+        exportedAt: new Date().toISOString()
+      }
+    });
+  }
+});
+
+// Get booking status summary for dashboard
+export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  
+  // Get status summary
+  const statusSummary = await prisma.booking.groupBy({
+    by: ['status'],
+    where: { dealershipId: user.dealershipId },
+    _count: true,
+    orderBy: { _count: { status: 'desc' } }
+  });
+  
+  // Get recent bookings count (last 7 days)
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  
+  const recentBookings = await prisma.booking.count({
+    where: {
+      dealershipId: user.dealershipId,
+      createdAt: { gte: sevenDaysAgo }
+    }
+  });
+  
+  // Get pending bookings (need attention)
+  const pendingBookings = await prisma.booking.count({
+    where: {
+      dealershipId: user.dealershipId,
+      status: { in: ['PENDING', 'ASSIGNED'] }
+    }
+  });
+  
+  // Get overdue deliveries
+  const today = new Date();
+  const overdueDeliveries = await prisma.booking.count({
+    where: {
+      dealershipId: user.dealershipId,
+      expectedDeliveryDate: { lt: today },
+      status: { notIn: ['DELIVERED', 'CANCELLED'] }
+    }
+  });
+  
+  // Get advisor-wise summary
+  const advisorSummary = await prisma.booking.groupBy({
+    by: ['advisorId'],
+    where: { dealershipId: user.dealershipId },
+    _count: true,
+    orderBy: { _count: { advisorId: 'desc' } }
+  });
+  
+  // Get advisor names
+  const advisorDetails = await Promise.all(
+    advisorSummary.map(async (item) => {
+      const advisor = await prisma.user.findUnique({
+        where: { firebaseUid: item.advisorId || '' },
+        select: { name: true, email: true }
+      });
+      return {
+        advisorId: item.advisorId,
+        advisorName: advisor?.name || 'Unknown',
+        advisorEmail: advisor?.email || '',
+        bookingCount: item._count
+      };
+    })
+  );
+  
+  res.json({
+    success: true,
+    message: 'Booking status summary retrieved successfully',
+    data: {
+      statusBreakdown: statusSummary.map(item => ({
+        status: item.status,
+        count: item._count
+      })),
+      recentBookings,
+      pendingBookings,
+      overdueDeliveries,
+      advisorBreakdown: advisorDetails,
+      totalBookings: statusSummary.reduce((sum, item) => sum + item._count, 0),
+      summaryDate: new Date().toISOString()
+    }
+  });
+});
