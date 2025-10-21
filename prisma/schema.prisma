@@ -26,11 +26,19 @@ model User {
   isActive          Boolean           @default(true)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
+  
+  // FCM Notification fields
+  fcmToken          String?           @map("fcm_token")
+  deviceType        String?           @map("device_type") // 'android' or 'ios'
+  lastTokenUpdated  DateTime?         @map("last_token_updated")
+  
+  // Relations
   auditLogs         BookingAuditLog[] @relation("AuditLogs")
   adminImports      BookingImport[]   @relation("AdminImports")
   advisorBookings   Booking[]         @relation("AdvisorBookings")
   assignedEnquiries Enquiry[]         @relation("AssignedTo")
   createdEnquiries  Enquiry[]         @relation("CreatedBy")
+  notificationLogs  NotificationLog[] @relation("NotificationLogs")
   role              Role              @relation(fields: [roleId], references: [id])
   dealership        Dealership?       @relation(fields: [dealershipId], references: [id])
   manager           User?             @relation("ManagerSubordinates", fields: [managerId], references: [firebaseUid], onDelete: SetNull)
@@ -58,6 +66,13 @@ model Enquiry {
   variant             String?
   dealerCode          String?         @map("dealer_code")
   dealershipId        String?         @map("dealership_id") // Multi-tenant dealership
+  
+  // Follow-up tracking fields
+  lastFollowUpDate    DateTime?       @map("last_follow_up_date")
+  followUpCount       Int             @default(0) @map("follow_up_count")
+  nextFollowUpDate    DateTime?       @map("next_follow_up_date")
+  
+  // Relations
   bookings            Booking[]
   assignedTo          User?           @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
   createdBy           User            @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
@@ -111,6 +126,13 @@ model Booking {
 
   dealerCode   String            @map("dealer_code")
   dealershipId String?           @map("dealership_id") // Multi-tenant dealership
+  
+  // Follow-up tracking fields
+  lastFollowUpDate    DateTime?       @map("last_follow_up_date")
+  followUpCount       Int             @default(0) @map("follow_up_count")
+  nextFollowUpDate    DateTime?       @map("next_follow_up_date")
+  
+  // Relations
   auditLogs    BookingAuditLog[]
   advisor      User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
   dealer       Dealer?           @relation(fields: [dealerId], references: [id])
@@ -399,4 +421,19 @@ enum DealershipType {
   HYUNDAI
   MARUTI
   OTHER
+}
+
+// Notification tracking model
+model NotificationLog {
+  id              String   @id @default(cuid())
+  userId          String
+  title           String
+  body            String
+  type            String   // 'enquiry_followup', 'booking_followup', etc.
+  entityId        String?  // enquiry ID or booking ID
+  sentAt          DateTime @default(now())
+  delivered       Boolean  @default(false)
+  user            User     @relation("NotificationLogs", fields: [userId], references: [firebaseUid])
+  
+  @@map("notification_logs")
 }

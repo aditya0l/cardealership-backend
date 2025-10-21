@@ -90,8 +90,12 @@ const startServer = async () => {
     // Check database connection
     await checkDatabaseConnection();
     
-    // Initialize roles
-    await initializeRoles();
+    // Initialize roles (skip if already exist)
+    try {
+      await initializeRoles();
+    } catch (error) {
+      console.log('⚠️ Role initialization skipped (roles may already exist)');
+    }
     
             // Check Redis connection and initialize job processor (optional for basic functionality)
             const redisConnected = await checkRedisConnection();

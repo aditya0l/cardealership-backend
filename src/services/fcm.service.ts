@@ -164,6 +164,136 @@ class FCMService {
       }
     });
   }
+
+  // Follow-up notification templates
+  async notifyFollowUpReminder(
+    token: string,
+    customerName: string,
+    entityType: string,
+    entityId: string,
+    priority: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM'
+  ): Promise<boolean> {
+    return this.sendNotification(token, {
+      title: `Follow-up Required - ${priority === 'HIGH' ? '🚨' : '📋'}`,
+      body: `Don't forget to follow up with ${customerName}`,
+      data: {
+        type: 'follow_up',
+        entityType,
+        entityId,
+        priority
+      }
+    });
+  }
+
+  async notifyUrgentFollowUp(
+    token: string,
+    customerName: string,
+    entityType: string,
+    entityId: string,
+    reason: string
+  ): Promise<boolean> {
+    return this.sendNotification(token, {
+      title: '🚨 URGENT: Follow-up Required',
+      body: `${customerName} needs immediate attention - ${reason}`,
+      data: {
+        type: 'urgent_follow_up',
+        entityType,
+        entityId,
+        priority: 'HIGH'
+      }
+    });
+  }
+
+  async notifyDeliveryReminder(
+    token: string,
+    customerName: string,
+    vehicle: string,
+    daysUntilDelivery: number
+  ): Promise<boolean> {
+    let title = '';
+    let body = '';
+
+    if (daysUntilDelivery === 0) {
+      title = '🚗 Delivery Today';
+      body = `Today's delivery for ${customerName} - ${vehicle}`;
+    } else if (daysUntilDelivery === 1) {
+      title = '🚗 Delivery Tomorrow';
+      body = `Tomorrow's delivery for ${customerName} - ${vehicle}`;
+    } else if (daysUntilDelivery > 0) {
+      title = `🚗 Delivery in ${daysUntilDelivery} Days`;
+      body = `Delivery approaching for ${customerName} - ${vehicle}`;
+    } else {
+      title = '⚠️ Overdue Delivery';
+      body = `Overdue delivery for ${customerName} - ${vehicle} (${Math.abs(daysUntilDelivery)} days late)`;
+    }
+
+    return this.sendNotification(token, {
+      title,
+      body,
+      data: {
+        type: 'delivery_reminder',
+        priority: daysUntilDelivery <= 1 ? 'HIGH' : 'MEDIUM',
+        daysUntilDelivery: daysUntilDelivery.toString()
+      }
+    });
+  }
+
+  async notifyTeamPerformance(
+    token: string,
+    teamName: string,
+    metrics: {
+      enquiries: number;
+      bookings: number;
+      conversions: number;
+    }
+  ): Promise<boolean> {
+    return this.sendNotification(token, {
+      title: '📊 Team Performance Update',
+      body: `${teamName}: ${metrics.enquiries} enquiries, ${metrics.bookings} bookings, ${metrics.conversions}% conversion`,
+      data: {
+        type: 'team_performance',
+        priority: 'LOW',
+        metrics: JSON.stringify(metrics)
+      }
+    });
+  }
+
+  async notifySystemAlert(
+    token: string,
+    alertType: string,
+    message: string,
+    priority: 'HIGH' | 'MEDIUM' | 'LOW' = 'MEDIUM'
+  ): Promise<boolean> {
+    return this.sendNotification(token, {
+      title: `🔔 System Alert - ${alertType}`,
+      body: message,
+      data: {
+        type: 'system_alert',
+        alertType,
+        priority
+      }
+    });
+  }
+
+  async notifyAssignmentUpdate(
+    token: string,
+    entityType: 'enquiry' | 'booking',
+    entityId: string,
+    action: 'assigned' | 'reassigned' | 'unassigned',
+    details: string
+  ): Promise<boolean> {
+    return this.sendNotification(token, {
+      title: `${entityType === 'enquiry' ? '📋' : '🚗'} ${entityType.charAt(0).toUpperCase() + entityType.slice(1)} ${action.charAt(0).toUpperCase() + action.slice(1)}`,
+      body: details,
+      data: {
+        type: 'assignment_update',
+        entityType,
+        entityId,
+        action,
+        priority: 'MEDIUM'
+      }
+    });
+  }
 }
 
 export default new FCMService();

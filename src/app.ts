@@ -13,9 +13,13 @@ import stockRoutes from './routes/stock.routes'; // Updated to use Vehicle model
 import dashboardRoutes from './routes/dashboard.routes';
 import modelRoutes from './routes/model.routes';
 import dealershipRoutes from './routes/dealership.routes'; // Multi-tenant dealership system
+import notificationRoutes from './routes/notification.routes'; // FCM notification management
 
 // Import middleware
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
+
+// Import cron service for automated follow-up notifications
+import './services/cron.service';
 
 const app = express();
 
@@ -132,6 +136,7 @@ app.use('/api/stock', stockRoutes); // Re-enabled with Vehicle model and RBAC
 app.use('/api/models', modelRoutes); // Model master data management
 app.use('/api/dashboard', dashboardRoutes); // Dashboard analytics endpoints
 app.use('/api/dealerships', dealershipRoutes); // Multi-tenant dealership system
+app.use('/api/notifications', notificationRoutes); // FCM notification management
 
 // Catch 404 and forward to error handler
 app.use(notFoundHandler);
