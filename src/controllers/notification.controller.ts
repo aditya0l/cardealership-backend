@@ -19,23 +19,33 @@ export const updateFCMToken = asyncHandler(async (req: AuthenticatedRequest, res
   const userId = req.user.firebaseUid;
 
   if (!fcmToken) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: 'FCM token is required'
     });
-    return;
   }
 
   // Validate device type
   if (deviceType && !['android', 'ios'].includes(deviceType)) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: 'Device type must be either "android" or "ios"'
     });
-    return;
   }
 
   try {
+    // Check if user exists first
+    const existingUser = await prisma.user.findUnique({
+      where: { firebaseUid: userId }
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
     const user = await prisma.user.update({
       where: { firebaseUid: userId },
       data: {
@@ -53,16 +63,33 @@ export const updateFCMToken = asyncHandler(async (req: AuthenticatedRequest, res
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'FCM token updated successfully',
       data: user
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating FCM token:', error);
-    res.status(500).json({
+    
+    // More specific error handling
+    if (error.code === 'P2002') {
+      return res.status(400).json({
+        success: false,
+        message: 'FCM token already exists for another user'
+      });
+    }
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      message: 'Failed to update FCM token'
+      message: 'Failed to update FCM token',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -85,23 +112,23 @@ export const getFCMToken = asyncHandler(async (req: AuthenticatedRequest, res: R
     });
 
     if (!user) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: 'User not found'
       });
-      return;
     }
 
-    res.json({
+    return res.json({
       success: true,
       message: 'FCM token retrieved successfully',
       data: user
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error retrieving FCM token:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Failed to retrieve FCM token'
+      message: 'Failed to retrieve FCM token',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -120,15 +147,24 @@ export const removeFCMToken = asyncHandler(async (req: AuthenticatedRequest, res
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'FCM token removed successfully'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error removing FCM token:', error);
-    res.status(500).json({
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      message: 'Failed to remove FCM token'
+      message: 'Failed to remove FCM token',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -165,7 +201,7 @@ export const getNotificationHistory = asyncHandler(async (req: AuthenticatedRequ
       prisma.notificationLog.count({ where })
     ]);
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Notification history retrieved successfully',
       data: {
@@ -178,11 +214,12 @@ export const getNotificationHistory = asyncHandler(async (req: AuthenticatedRequ
         }
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error retrieving notification history:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Failed to retrieve notification history'
+      message: 'Failed to retrieve notification history',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -216,7 +253,7 @@ export const getNotificationStats = asyncHandler(async (req: AuthenticatedReques
       }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Notification statistics retrieved successfully',
       data: {
@@ -229,11 +266,12 @@ export const getNotificationStats = asyncHandler(async (req: AuthenticatedReques
         }))
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error retrieving notification statistics:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Failed to retrieve notification statistics'
+      message: 'Failed to retrieve notification statistics',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -252,11 +290,10 @@ export const markNotificationAsRead = asyncHandler(async (req: AuthenticatedRequ
     });
 
     if (!notification) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: 'Notification not found'
       });
-      return;
     }
 
     await prisma.notificationLog.update({
@@ -264,15 +301,24 @@ export const markNotificationAsRead = asyncHandler(async (req: AuthenticatedRequ
       data: { delivered: true }
     });
 
-    res.json({
+    return res.json({
       success: true,
       message: 'Notification marked as read'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error marking notification as read:', error);
-    res.status(500).json({
+    
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    return res.status(500).json({
       success: false,
-      message: 'Failed to mark notification as read'
+      message: 'Failed to mark notification as read',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
@@ -283,11 +329,10 @@ export const sendTestNotification = asyncHandler(async (req: AuthenticatedReques
   const { title, body } = req.body;
 
   if (!title || !body) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: 'Title and body are required for test notification'
     });
-    return;
   }
 
   try {
@@ -297,11 +342,10 @@ export const sendTestNotification = asyncHandler(async (req: AuthenticatedReques
     });
 
     if (!user?.fcmToken) {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: 'FCM token not found. Please update your FCM token first.'
       });
-      return;
     }
 
     // Import FCMService dynamically to avoid circular dependencies
@@ -328,21 +372,22 @@ export const sendTestNotification = asyncHandler(async (req: AuthenticatedReques
         }
       });
 
-      res.json({
+      return res.json({
         success: true,
         message: 'Test notification sent successfully'
       });
     } else {
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         message: 'Failed to send test notification'
       });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error sending test notification:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Failed to send test notification'
+      message: 'Failed to send test notification',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });
