@@ -146,9 +146,18 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
   
   // Trigger notification for new enquiry
   try {
+    console.log('🔔 Attempting to send enquiry notification for:', enquiry.id);
+    console.log('🔔 Enquiry details:', {
+      id: enquiry.id,
+      customerName: enquiry.customerName,
+      category: enquiry.category,
+      dealershipId: enquiry.dealershipId
+    });
     await NotificationTriggerService.triggerNewEnquiryNotification(enquiry);
-  } catch (error) {
-    console.error('Error sending new enquiry notification:', error);
+    console.log('✅ Enquiry notification sent successfully');
+  } catch (error: any) {
+    console.error('❌ Error sending new enquiry notification:', error);
+    console.error('❌ Error details:', error.message, error.stack);
     // Don't fail the enquiry creation if notification fails
   }
   
@@ -752,21 +761,6 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
             name: true,
             email: true
           }
-        },
-        remarkHistory: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                email: true,
-                role: {
-                  select: { name: true }
-                }
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5 // Latest 5 remarks
         },
         _count: {
           select: {

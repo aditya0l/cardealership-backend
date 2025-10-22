@@ -64,7 +64,9 @@ class NotificationTriggerService {
     entityId?: string,
     priority: 'LOW' | 'MEDIUM' | 'HIGH' = 'MEDIUM'
   ): Promise<void> {
+    console.log('🔔 sendNotificationToUsers called for', userIds.length, 'users');
     for (const userId of userIds) {
+      console.log('🔔 Sending notification to user:', userId);
       await this.sendNotificationToUser(userId, title, body, type, entityId, priority);
     }
   }
@@ -112,16 +114,25 @@ class NotificationTriggerService {
   async triggerNewEnquiryNotification(enquiry: any): Promise<void> {
     const { id, customerName, model, variant, category, createdByUserId, dealershipId } = enquiry;
     
+    console.log('🔔 triggerNewEnquiryNotification called with:', {
+      id, customerName, model, variant, category, dealershipId
+    });
+    
     if (!dealershipId) {
-      console.warn('No dealershipId found for enquiry notification:', id);
+      console.warn('❌ No dealershipId found for enquiry notification:', id);
       return;
     }
     
     const title = `New ${category} Enquiry - ${customerName}`;
     const body = `${model} ${variant} - ${customerName}`;
     
+    console.log('🔔 Notification content:', { title, body });
+    
     // Notify management
     const managementUsers = await this.getManagementUsers(dealershipId);
+    console.log('🔔 Management users found:', managementUsers.length);
+    console.log('🔔 Management users:', managementUsers.map(u => ({ name: u.name, fcmToken: !!u.fcmToken })));
+    
     const managementUserIds = managementUsers.map(u => u.firebaseUid);
     
     await this.sendNotificationToUsers(
@@ -132,6 +143,8 @@ class NotificationTriggerService {
       id,
       category === 'HOT' ? 'HIGH' : 'MEDIUM'
     );
+    
+    console.log('✅ Enquiry notification sent to', managementUserIds.length, 'users');
   }
 
   // Trigger notification for enquiry status change
