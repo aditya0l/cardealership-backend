@@ -20,7 +20,7 @@ import remarkRoutes from './routes/remark.routes'; // Date-wise remarks and stat
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
 
 // Import cron service for automated follow-up notifications
-// import './services/cron.service';
+import './services/cron.service';
 
 const app = express();
 

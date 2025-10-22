@@ -1035,21 +1035,6 @@ export const getBookingsWithRemarks = asyncHandler(async (req: AuthenticatedRequ
             customerName: true,
             status: true
           }
-        },
-        remarkHistory: {
-          include: {
-            user: {
-              select: {
-                name: true,
-                email: true,
-                role: {
-                  select: { name: true }
-                }
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5 // Latest 5 remarks
         }
       },
       orderBy: { updatedAt: 'desc' },
