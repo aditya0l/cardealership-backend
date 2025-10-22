@@ -172,12 +172,41 @@ export const removeFCMToken = asyncHandler(async (req: AuthenticatedRequest, res
 // Get notification history for authenticated user
 export const getNotificationHistory = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user.firebaseUid;
+  const userRole = req.user.role.name;
   const { page = 1, limit = 50, type } = req.query;
 
   try {
     const skip = (Number(page) - 1) * Number(limit);
+
+    // Build where clause based on user role
+    let where: any = { userId };
     
-    const where: any = { userId };
+    // Role-based filtering
+    if (userRole === 'CUSTOMER_ADVISOR') {
+      // Customer Advisors only see their own notifications
+      where.userId = userId;
+    } else if (userRole === 'TEAM_LEAD') {
+      // Team Leads see their own notifications + team member notifications
+      const teamMembers = await prisma.user.findMany({
+        where: { managerId: userId },
+        select: { firebaseUid: true }
+      });
+      const teamMemberIds = teamMembers.map(member => member.firebaseUid);
+      where = {
+        OR: [
+          { userId },
+          { userId: { in: teamMemberIds } }
+        ]
+      };
+    } else if (userRole === 'SALES_MANAGER' || userRole === 'GENERAL_MANAGER' || userRole === 'ADMIN') {
+      // Management sees all notifications in their dealership
+      where = {
+        user: {
+          dealershipId: req.user.dealershipId
+        }
+      };
+    }
+
     if (type) {
       where.type = type;
     }
@@ -195,7 +224,16 @@ export const getNotificationHistory = asyncHandler(async (req: AuthenticatedRequ
           type: true,
           entityId: true,
           sentAt: true,
-          delivered: true
+          delivered: true,
+          user: {
+            select: {
+              firebaseUid: true,
+              name: true,
+              role: {
+                select: { name: true }
+              }
+            }
+          }
         }
       }),
       prisma.notificationLog.count({ where })
@@ -227,19 +265,45 @@ export const getNotificationHistory = asyncHandler(async (req: AuthenticatedRequ
 // Get notification statistics for authenticated user
 export const getNotificationStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const userId = req.user.firebaseUid;
+  const userRole = req.user.role.name;
 
   try {
+    // Build where clause based on user role (same logic as getNotificationHistory)
+    let where: any = { userId };
+    
+    if (userRole === 'CUSTOMER_ADVISOR') {
+      where.userId = userId;
+    } else if (userRole === 'TEAM_LEAD') {
+      const teamMembers = await prisma.user.findMany({
+        where: { managerId: userId },
+        select: { firebaseUid: true }
+      });
+      const teamMemberIds = teamMembers.map(member => member.firebaseUid);
+      where = {
+        OR: [
+          { userId },
+          { userId: { in: teamMemberIds } }
+        ]
+      };
+    } else if (userRole === 'SALES_MANAGER' || userRole === 'GENERAL_MANAGER' || userRole === 'ADMIN') {
+      where = {
+        user: {
+          dealershipId: req.user.dealershipId
+        }
+      };
+    }
+
     const [totalNotifications, unreadCount, typeStats] = await Promise.all([
-      prisma.notificationLog.count({ where: { userId } }),
+      prisma.notificationLog.count({ where }),
       prisma.notificationLog.count({ 
         where: { 
-          userId,
+          ...where,
           delivered: false 
         } 
       }),
       prisma.notificationLog.groupBy({
         by: ['type'],
-        where: { userId },
+        where,
         _count: true,
         orderBy: { _count: { type: 'desc' } }
       })
@@ -248,7 +312,7 @@ export const getNotificationStats = asyncHandler(async (req: AuthenticatedReques
     const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const recentNotifications = await prisma.notificationLog.count({
       where: {
-        userId,
+        ...where,
         sentAt: { gte: last7Days }
       }
     });
@@ -350,7 +414,7 @@ export const sendTestNotification = asyncHandler(async (req: AuthenticatedReques
 
     // Import FCMService dynamically to avoid circular dependencies
     const FCMService = (await import('../services/fcm.service')).default;
-    
+
     const success = await FCMService.sendNotification(user.fcmToken, {
       title,
       body,
@@ -387,6 +451,88 @@ export const sendTestNotification = asyncHandler(async (req: AuthenticatedReques
     return res.status(500).json({
       success: false,
       message: 'Failed to send test notification',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Mark multiple notifications as read
+export const markMultipleNotificationsAsRead = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user.firebaseUid;
+  const { notificationIds } = req.body;
+
+  if (!notificationIds || !Array.isArray(notificationIds) || notificationIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'notificationIds array is required'
+    });
+  }
+
+  try {
+    const result = await prisma.notificationLog.updateMany({
+      where: {
+        id: { in: notificationIds },
+        userId
+      },
+      data: { delivered: true }
+    });
+
+    return res.json({
+      success: true,
+      message: `${result.count} notification(s) marked as read`,
+      data: { updatedCount: result.count }
+    });
+  } catch (error: any) {
+    console.error('Error marking multiple notifications as read:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to mark notifications as read',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
+// Delete notification
+export const deleteNotification = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.user.firebaseUid;
+  const { notificationId } = req.params;
+
+  try {
+    const notification = await prisma.notificationLog.findFirst({
+      where: {
+        id: notificationId,
+        userId
+      }
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    await prisma.notificationLog.delete({
+      where: { id: notificationId }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Notification deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting notification:', error);
+
+    if (error.code === 'P2025') {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete notification',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

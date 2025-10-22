@@ -2,6 +2,7 @@ import { Response } from 'express';
 import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import NotificationTriggerService from '../services/notification-trigger.service';
 import { 
   filterReadableFields, 
   filterWritableFields, 
@@ -126,6 +127,14 @@ export const createBooking = asyncHandler(async (req: AuthenticatedRequest, res:
 
     // Filter response based on user's read permissions
     const filteredBooking = filterReadableFields(booking, user.role.name);
+
+    // Trigger notification for new booking
+    try {
+      await NotificationTriggerService.triggerNewBookingNotification(booking);
+    } catch (error) {
+      console.error('Error sending new booking notification:', error);
+      // Don't fail the booking creation if notification fails
+    }
 
     res.status(201).json({
       success: true,
@@ -404,6 +413,20 @@ export const updateBooking = asyncHandler(async (req: AuthenticatedRequest, res:
 
     // Filter response based on user's read permissions
     const filteredBooking = filterReadableFields(updatedBooking, user.role.name);
+
+    // Trigger notification for status changes
+    try {
+      if (req.body.status && req.body.status !== existingBooking.status) {
+        await NotificationTriggerService.triggerBookingStatusChangeNotification(
+          updatedBooking, 
+          existingBooking.status, 
+          req.body.status
+        );
+      }
+    } catch (error) {
+      console.error('Error sending booking update notification:', error);
+      // Don't fail the booking update if notification fails
+    }
 
     res.json({
       success: true,
@@ -931,6 +954,20 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
 
     // Filter response based on user's read permissions
     const filteredBooking = filterReadableFields(updatedBooking, user.role.name);
+
+    // Trigger notification for status changes
+    try {
+      if (req.body.status && req.body.status !== existingBooking.status) {
+        await NotificationTriggerService.triggerBookingStatusChangeNotification(
+          updatedBooking, 
+          existingBooking.status, 
+          req.body.status
+        );
+      }
+    } catch (error) {
+      console.error('Error sending booking status update notification:', error);
+      // Don't fail the booking update if notification fails
+    }
 
     res.json({
       success: true,

@@ -3,6 +3,7 @@ import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
 import { EnquiryStatus, EnquiryCategory } from '@prisma/client';
+import NotificationTriggerService from '../services/notification-trigger.service';
 
 // Define the EnquirySource enum locally until migration is applied
 enum EnquirySource {
@@ -142,6 +143,14 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
       }
     }
   });
+  
+  // Trigger notification for new enquiry
+  try {
+    await NotificationTriggerService.triggerNewEnquiryNotification(enquiry);
+  } catch (error) {
+    console.error('Error sending new enquiry notification:', error);
+    // Don't fail the enquiry creation if notification fails
+  }
   
   res.status(201).json({
     success: true,
@@ -439,6 +448,30 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
         data: { status: EnquiryStatus.CLOSED }
       });
     }
+  }
+
+  // Trigger notifications for status changes
+  try {
+    if (status && status !== existingEnquiry.status) {
+      await NotificationTriggerService.triggerEnquiryStatusChangeNotification(
+        enquiry, 
+        existingEnquiry.status, 
+        status
+      );
+    }
+
+    // Trigger notification for new booking if created
+    if (booking) {
+      await NotificationTriggerService.triggerNewBookingNotification(booking);
+    }
+
+    // Trigger urgent notification for HOT enquiries
+    if (category === 'HOT' && existingEnquiry.category !== 'HOT') {
+      await NotificationTriggerService.triggerUrgentEnquiryNotification(enquiry);
+    }
+  } catch (error) {
+    console.error('Error sending enquiry update notifications:', error);
+    // Don't fail the enquiry update if notification fails
   }
 
   // Return the updated enquiry and booking (if created)

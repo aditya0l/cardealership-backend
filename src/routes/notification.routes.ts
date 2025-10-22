@@ -6,23 +6,32 @@ import {
   getNotificationHistory,
   getNotificationStats,
   markNotificationAsRead,
+  markMultipleNotificationsAsRead,
+  deleteNotification,
   sendTestNotification
 } from '../controllers/notification.controller';
 import { authenticate } from '../middlewares/auth.middleware';
+import { 
+  notificationRateLimit, 
+  fcmTokenRateLimit, 
+  testNotificationRateLimit 
+} from '../middlewares/rate-limit.middleware';
 
 const router = Router();
 
-// FCM Token Management
-router.post('/fcm-token', authenticate, updateFCMToken);
-router.get('/fcm-token', authenticate, getFCMToken);
-router.delete('/fcm-token', authenticate, removeFCMToken);
+// FCM Token Management (with rate limiting)
+router.post('/fcm-token', fcmTokenRateLimit, authenticate, updateFCMToken);
+router.get('/fcm-token', notificationRateLimit, authenticate, getFCMToken);
+router.delete('/fcm-token', fcmTokenRateLimit, authenticate, removeFCMToken);
 
-// Notification History & Stats
-router.get('/history', authenticate, getNotificationHistory);
-router.get('/stats', authenticate, getNotificationStats);
-router.patch('/:notificationId/read', authenticate, markNotificationAsRead);
+// Notification History & Stats (with rate limiting)
+router.get('/history', notificationRateLimit, authenticate, getNotificationHistory);
+router.get('/stats', notificationRateLimit, authenticate, getNotificationStats);
+router.patch('/:notificationId/read', notificationRateLimit, authenticate, markNotificationAsRead);
+router.patch('/mark-read', notificationRateLimit, authenticate, markMultipleNotificationsAsRead);
+router.delete('/:notificationId', notificationRateLimit, authenticate, deleteNotification);
 
-// Test Notification (for development)
-router.post('/test', authenticate, sendTestNotification);
+// Test Notification (with strict rate limiting)
+router.post('/test', testNotificationRateLimit, authenticate, sendTestNotification);
 
 export default router;
