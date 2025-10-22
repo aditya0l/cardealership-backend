@@ -5,7 +5,10 @@ class CronService {
   private isInitialized = false;
   
   constructor() {
-    this.setupCronJobs();
+    // Delay cron job setup to avoid blocking server startup
+    setTimeout(() => {
+      this.setupCronJobs();
+    }, 5000); // 5 second delay
   }
   
   private setupCronJobs(): void {
@@ -14,7 +17,8 @@ class CronService {
       return;
     }
     
-    console.log('🕐 Setting up cron jobs for follow-up notifications...');
+    try {
+      console.log('🕐 Setting up cron jobs for follow-up notifications...');
     
     // Daily follow-up processing at 9 AM
     cron.schedule('0 9 * * *', async () => {
@@ -61,13 +65,17 @@ class CronService {
       }
     });
     
-    this.isInitialized = true;
-    console.log('✅ Cron jobs initialized successfully');
-    console.log('📅 Scheduled jobs:');
-    console.log('  - Daily follow-ups: 9:00 AM IST');
-    console.log('  - Hourly urgent checks: Every hour');
-    console.log('  - Evening reminders: 6:00 PM IST');
-    console.log('  - Weekly summary: Monday 10:00 AM IST');
+      this.isInitialized = true;
+      console.log('✅ Cron jobs initialized successfully');
+      console.log('📅 Scheduled jobs:');
+      console.log('  - Daily follow-ups: 9:00 AM IST');
+      console.log('  - Hourly urgent checks: Every hour');
+      console.log('  - Evening reminders: 6:00 PM IST');
+      console.log('  - Weekly summary: Monday 10:00 AM IST');
+    } catch (error) {
+      console.error('❌ Error setting up cron jobs:', error);
+      console.log('⚠️ Cron jobs will be retried on next server restart');
+    }
   }
   
   // Manual trigger methods for testing

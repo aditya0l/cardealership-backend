@@ -51,6 +51,7 @@ class NotificationTriggerService {
       }
     } catch (error) {
       console.error('Error sending notification to user:', error);
+      // Don't throw error to prevent crashing the main application
     }
   }
 
