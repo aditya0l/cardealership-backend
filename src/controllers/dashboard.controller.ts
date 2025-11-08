@@ -2,7 +2,8 @@ import { Response } from 'express';
 import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { RoleName } from '@prisma/client';
+import { RoleName, EnquiryStatus, BookingStatus } from '@prisma/client';
+import { getTeamMemberIds } from '../services/team.service';
 
 /**
  * Get revenue chart data for the last 12 months
@@ -353,5 +354,127 @@ export const getDashboardStats = asyncHandler(async (req: AuthenticatedRequest, 
     console.error('Error fetching dashboard stats:', error);
     throw createError('Failed to fetch dashboard statistics', 500);
   }
+});
+
+export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(startOfDay);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  let teamMemberIds: string[] = [];
+  if (user.role.name !== RoleName.ADMIN) {
+    teamMemberIds = await getTeamMemberIds(user.firebaseUid, false);
+  }
+
+  const enquiryWhere: any = {
+    dealershipId: user.dealershipId,
+    status: EnquiryStatus.OPEN,
+    expectedBookingDate: {
+      gte: startOfDay,
+      lte: endOfDay
+    }
+  };
+
+  const bookingWhere: any = {
+    dealershipId: user.dealershipId,
+    status: {
+      notIn: [BookingStatus.CANCELLED, BookingStatus.DELIVERED]
+    },
+    expectedDeliveryDate: {
+      gte: startOfDay,
+      lte: endOfDay
+    }
+  };
+
+  switch (user.role.name as RoleName) {
+    case RoleName.CUSTOMER_ADVISOR:
+      enquiryWhere.OR = [
+        { createdByUserId: user.firebaseUid },
+        { assignedToUserId: user.firebaseUid }
+      ];
+      bookingWhere.OR = [
+        { advisorId: user.firebaseUid }
+      ];
+      break;
+    case RoleName.TEAM_LEAD: {
+      const relevantIds = Array.from(new Set([user.firebaseUid, ...teamMemberIds]));
+      enquiryWhere.OR = [
+        { createdByUserId: { in: relevantIds } },
+        { assignedToUserId: { in: relevantIds } }
+      ];
+      bookingWhere.OR = [
+        { advisorId: { in: relevantIds } }
+      ];
+      break;
+    }
+    case RoleName.SALES_MANAGER:
+    case RoleName.GENERAL_MANAGER: {
+      const relevantIds = Array.from(new Set([user.firebaseUid, ...teamMemberIds]));
+      enquiryWhere.OR = [
+        { createdByUserId: { in: relevantIds } },
+        { assignedToUserId: { in: relevantIds } }
+      ];
+      bookingWhere.OR = [
+        { advisorId: { in: relevantIds } }
+      ];
+      break;
+    }
+    case RoleName.ADMIN:
+      break;
+    default:
+      enquiryWhere.OR = [
+        { createdByUserId: user.firebaseUid }
+      ];
+      bookingWhere.OR = [
+        { advisorId: user.firebaseUid }
+      ];
+  }
+
+  const [enquiries, bookings] = await Promise.all([
+    prisma.enquiry.findMany({
+      where: enquiryWhere,
+      select: {
+        id: true,
+        customerName: true,
+        customerContact: true,
+        model: true,
+        variant: true,
+        expectedBookingDate: true,
+        assignedToUserId: true,
+        createdByUserId: true
+      },
+      orderBy: { expectedBookingDate: 'asc' }
+    }),
+    prisma.booking.findMany({
+      where: bookingWhere,
+      select: {
+        id: true,
+        customerName: true,
+        customerPhone: true,
+        variant: true,
+        expectedDeliveryDate: true,
+        advisorId: true,
+        stockAvailability: true,
+        chassisNumber: true,
+        allocationOrderNumber: true
+      },
+      orderBy: { expectedDeliveryDate: 'asc' }
+    })
+  ]);
+
+  res.json({
+    success: true,
+    message: "Today's booking plan retrieved successfully",
+    data: {
+      date: startOfDay.toISOString(),
+      enquiriesDueToday: enquiries.length,
+      bookingsDueToday: bookings.length,
+      enquiries,
+      bookings
+    }
+  });
 });
 

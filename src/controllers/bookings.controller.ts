@@ -46,7 +46,8 @@ interface CreateBookingRequest {
   
   // Stock Information
   stockAvailability?: string;
-  backOrderStatus?: boolean;
+  chassisNumber?: string;
+  allocationOrderNumber?: string;
   
   // System Fields
   remarks?: string;
@@ -374,6 +375,28 @@ export const updateBooking = asyncHandler(async (req: AuthenticatedRequest, res:
         } catch (error) {
           throw createError(`Invalid date format for ${field}. Use ISO-8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)`, 400);
         }
+      }
+    }
+
+    // Validate stock availability updates
+    if (filteredUpdateData.stockAvailability) {
+      const validStockValues = ['VNA', 'VEHICLE_AVAILABLE'];
+      if (!validStockValues.includes(filteredUpdateData.stockAvailability)) {
+        throw createError('Invalid stock availability. Must be "VNA" or "VEHICLE_AVAILABLE"', 400);
+      }
+
+      if (filteredUpdateData.stockAvailability === 'VEHICLE_AVAILABLE') {
+        if (!filteredUpdateData.chassisNumber) {
+          throw createError('Chassis number is required when stock is available', 400);
+        }
+        filteredUpdateData.allocationOrderNumber = null;
+      }
+
+      if (filteredUpdateData.stockAvailability === 'VNA') {
+        if (!filteredUpdateData.allocationOrderNumber) {
+          throw createError('Allocation/order number is required when vehicle is not available', 400);
+        }
+        filteredUpdateData.chassisNumber = null;
       }
     }
 
@@ -783,7 +806,7 @@ export const getBookingAuditLog = asyncHandler(async (req: AuthenticatedRequest,
  * 
  * Allows advisors to update:
  * - status, financeRequired, financerName, fileLoginDate, approvalDate
- * - stockAvailability, expectedDeliveryDate, backOrderStatus, rtoDate
+ * - stockAvailability, expectedDeliveryDate, rtoDate
  * 
  * Role-specific remarks:
  * - advisorRemarks (Customer Advisor)
@@ -817,7 +840,6 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
         approvalDate: true,
         stockAvailability: true,
         expectedDeliveryDate: true,
-        backOrderStatus: true,
         rtoDate: true,
         remarks: true,
         advisorRemarks: true,
@@ -846,7 +868,8 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
       'approvalDate',
       'stockAvailability',
       'expectedDeliveryDate',
-      'backOrderStatus',
+    'chassisNumber',
+    'allocationOrderNumber',
       'rtoDate',
       // Role-specific remarks fields
       'remarks',
@@ -879,20 +902,29 @@ export const updateBookingStatusAndFields = asyncHandler(async (req: Authenticat
       throw createError('Invalid booking status', 400);
     }
 
-    // Validate stockAvailability enum if provided
+    // Validate boolean fields
+    if (updateData.financeRequired !== undefined && typeof updateData.financeRequired !== 'boolean') {
+      throw createError('financeRequired must be a boolean', 400);
+    }
     if (updateData.stockAvailability) {
       const validStockValues = ['VNA', 'VEHICLE_AVAILABLE'];
       if (!validStockValues.includes(updateData.stockAvailability)) {
         throw createError('Invalid stock availability. Must be "VNA" or "VEHICLE_AVAILABLE"', 400);
       }
-    }
 
-    // Validate boolean fields
-    if (updateData.financeRequired !== undefined && typeof updateData.financeRequired !== 'boolean') {
-      throw createError('financeRequired must be a boolean', 400);
-    }
-    if (updateData.backOrderStatus !== undefined && typeof updateData.backOrderStatus !== 'boolean') {
-      throw createError('backOrderStatus must be a boolean', 400);
+      if (updateData.stockAvailability === 'VEHICLE_AVAILABLE') {
+        if (!updateData.chassisNumber) {
+          throw createError('Chassis number is required when stock is available', 400);
+        }
+        updateData.allocationOrderNumber = null;
+      }
+
+      if (updateData.stockAvailability === 'VNA') {
+        if (!updateData.allocationOrderNumber) {
+          throw createError('Allocation/order number is required when vehicle is not available', 400);
+        }
+        updateData.chassisNumber = null;
+      }
     }
 
     // Validate date fields (convert to Date objects if they're strings)
@@ -1128,7 +1160,8 @@ export const bulkDownloadBookings = asyncHandler(async (req: AuthenticatedReques
       'Approval Date': booking.approvalDate ? new Date(booking.approvalDate).toLocaleDateString() : '',
       'RTO Date': booking.rtoDate ? new Date(booking.rtoDate).toLocaleDateString() : '',
       'Stock Availability': booking.stockAvailability || '',
-      'Back Order': booking.backOrderStatus ? 'Yes' : 'No',
+      'Chassis Number': (booking as any).chassisNumber || '',
+      'Allocation Order Number': (booking as any).allocationOrderNumber || '',
       'Source': booking.source,
       'Created At': new Date(booking.createdAt).toLocaleDateString(),
       'Updated At': new Date(booking.updatedAt).toLocaleDateString(),
@@ -1168,7 +1201,8 @@ export const bulkDownloadBookings = asyncHandler(async (req: AuthenticatedReques
       { wch: 15 }, // Approval Date
       { wch: 12 }, // RTO Date
       { wch: 18 }, // Stock Availability
-      { wch: 12 }, // Back Order
+      { wch: 18 }, // Chassis Number
+      { wch: 22 }, // Allocation Order Number
       { wch: 15 }, // Source
       { wch: 12 }, // Created At
       { wch: 12 }, // Updated At

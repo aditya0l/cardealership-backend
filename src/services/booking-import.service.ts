@@ -45,7 +45,8 @@ export interface BookingImportRow {
   
   // Stock & Delivery
   stock_availability?: string; // VNA/Vehicle Available
-  back_order_status?: string | boolean;
+  chassis_number?: string;
+  allocation_order_number?: string;
   rto_date?: string;
   
   // Additional
@@ -202,7 +203,8 @@ export class BookingImportService {
       
       // Stock & Delivery
       stock_availability: row.stock_availability || undefined,
-      back_order_status: row.back_order_status || undefined,
+      chassis_number: row.chassis_number || undefined,
+      allocation_order_number: row.allocation_order_number || undefined,
       rto_date: row.rto_date || undefined,
       
       // Additional
@@ -287,14 +289,49 @@ export class BookingImportService {
       }
     }
 
-    if (row.back_order_status && typeof row.back_order_status === 'string') {
-      const boolValue = row.back_order_status.toLowerCase();
-      if (!['true', 'false', 'yes', 'no', '1', '0'].includes(boolValue)) {
+    if (data.stock_availability) {
+      const stockValue = data.stock_availability.toUpperCase();
+      if (!['VNA', 'VEHICLE_AVAILABLE'].includes(stockValue)) {
         errors.push({
-          field: 'back_order_status',
-          value: row.back_order_status,
-          message: 'Back order status must be true/false or yes/no'
+          field: 'stock_availability',
+          value: data.stock_availability,
+          message: 'Stock availability must be either "VNA" or "VEHICLE_AVAILABLE"'
         });
+      } else {
+        data.stock_availability = stockValue;
+        if (stockValue === 'VEHICLE_AVAILABLE') {
+          const chassis = row.chassis_number?.toString().trim();
+          if (!chassis) {
+            errors.push({
+              field: 'chassis_number',
+              value: row.chassis_number,
+              message: 'Chassis number is required when stock availability is VEHICLE_AVAILABLE'
+            });
+          } else {
+            data.chassis_number = chassis;
+            data.allocation_order_number = undefined;
+          }
+        }
+        if (stockValue === 'VNA') {
+          const orderNumber = row.allocation_order_number?.toString().trim();
+          if (!orderNumber) {
+            errors.push({
+              field: 'allocation_order_number',
+              value: row.allocation_order_number,
+              message: 'Allocation/order number is required when stock availability is VNA'
+            });
+          } else {
+            data.allocation_order_number = orderNumber;
+            data.chassis_number = undefined;
+          }
+        }
+      }
+    } else {
+      if (row.chassis_number && row.chassis_number.toString().trim()) {
+        data.chassis_number = row.chassis_number.toString().trim();
+      }
+      if (row.allocation_order_number && row.allocation_order_number.toString().trim()) {
+        data.allocation_order_number = row.allocation_order_number.toString().trim();
       }
     }
 
@@ -362,7 +399,11 @@ export class BookingImportService {
 
         // Convert boolean fields
         const financeRequired = this.convertToBoolean(row.finance_required);
-        const backOrderStatus = this.convertToBoolean(row.back_order_status);
+        const stockAvailability = row.stock_availability
+          ? (row.stock_availability as string).toUpperCase()
+          : undefined;
+        const chassisNumber = row.chassis_number ? row.chassis_number : null;
+        const allocationOrderNumber = row.allocation_order_number ? row.allocation_order_number : null;
 
         // Create booking with universal format
         await prisma.booking.create({
@@ -405,8 +446,9 @@ export class BookingImportService {
             approvalDate: row.approval_date ? new Date(row.approval_date) : null,
             
             // Stock & Delivery
-            stockAvailability: row.stock_availability as any,  // Will be validated by Prisma enum
-            backOrderStatus,
+            stockAvailability: stockAvailability as any,  // Will be validated by Prisma enum
+            chassisNumber,
+            allocationOrderNumber,
             rtoDate: row.rto_date ? new Date(row.rto_date) : null,
             
             // System Fields

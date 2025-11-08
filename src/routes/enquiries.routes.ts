@@ -14,6 +14,13 @@ import {
   bulkDownloadEnquiries,
   getEnquiryStatusSummary
 } from '../controllers/enquiries.controller';
+import {
+  uploadEnquiryImportFile,
+  previewEnquiryImportFile,
+  getEnquiryImports,
+  getEnquiryImportById,
+  downloadEnquiryImportErrors
+} from '../controllers/enquiry-import.controller';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
 
@@ -44,6 +51,32 @@ router.get('/with-remarks', getEnquiriesWithRemarks);
 router.get('/download', 
   authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER]), 
   bulkDownloadEnquiries
+);
+
+// Enquiry import endpoints
+router.post('/imports/upload',
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]),
+  uploadEnquiryImportFile
+);
+
+router.post('/imports/preview',
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]),
+  previewEnquiryImportFile
+);
+
+router.get('/imports',
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]),
+  getEnquiryImports
+);
+
+router.get('/imports/:id',
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]),
+  getEnquiryImportById
+);
+
+router.get('/imports/:id/errors',
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER]),
+  downloadEnquiryImportErrors
 );
 
 // Get enquiry status summary - Manager and Admin only

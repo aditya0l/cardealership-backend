@@ -40,6 +40,8 @@ model User {
   createdEnquiries  Enquiry[]         @relation("CreatedBy")
   notificationLogs  NotificationLog[] @relation("NotificationLogs")
   remarks           Remark[]          @relation("RemarkAuthor")
+  cancelledRemarks  Remark[]          @relation("RemarkCanceller")
+  enquiryImports    EnquiryImport[]   @relation("EnquiryAdminImports")
   role              Role              @relation(fields: [roleId], references: [id])
   dealership        Dealership?       @relation(fields: [dealershipId], references: [id])
   manager           User?             @relation("ManagerSubordinates", fields: [managerId], references: [firebaseUid], onDelete: SetNull)
@@ -59,13 +61,14 @@ model Enquiry {
   caRemarks           String?         @map("ca_remarks")
   color               String?
   customerContact     String          @map("customer_contact")
-  customerEmail       String          @map("customer_email")
+  customerEmail       String?         @map("customer_email")
   customerName        String          @map("customer_name")
   expectedBookingDate DateTime?       @map("expected_booking_date")
   model               String?
   source              EnquirySource   @default(WALK_IN)
   variant             String?
   dealerCode          String?         @map("dealer_code")
+  location            String?
   dealershipId        String?         @map("dealership_id") // Multi-tenant dealership
   
   // Follow-up tracking fields
@@ -115,7 +118,8 @@ model Booking {
   fileLoginDate        DateTime?          @map("file_login_date")
   approvalDate         DateTime?          @map("approval_date")
   stockAvailability    StockAvailability? @map("stock_availability")
-  backOrderStatus      Boolean?           @map("back_order_status")
+  chassisNumber        String?            @map("chassis_number")
+  allocationOrderNumber String?           @map("allocation_order_number")
   rtoDate              DateTime?          @map("rto_date")
 
   // Role-specific remarks fields
@@ -244,6 +248,43 @@ model BookingImportError {
   import       BookingImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@map("booking_import_errors")
+}
+
+model EnquiryImport {
+  id               String             @id @default(cuid())
+  adminId          String             @map("admin_id")
+  filename         String
+  originalFilename String?            @map("original_filename")
+  fileSize         BigInt?            @map("file_size")
+  totalRows        Int                @default(0) @map("total_rows")
+  processedRows    Int                @default(0) @map("processed_rows")
+  successfulRows   Int                @default(0) @map("successful_rows")
+  failedRows       Int                @default(0) @map("failed_rows")
+  status           ImportStatus       @default(PENDING)
+  importSettings   Json?              @map("import_settings")
+  errorSummary     Json?              @map("error_summary")
+  startedAt        DateTime?          @map("started_at")
+  completedAt      DateTime?          @map("completed_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  errors           EnquiryImportError[]
+  admin            User               @relation("EnquiryAdminImports", fields: [adminId], references: [firebaseUid])
+
+  @@map("enquiry_imports")
+}
+
+model EnquiryImportError {
+  id           String         @id @default(cuid())
+  importId     String         @map("import_id")
+  rowNumber    Int            @map("row_number")
+  rawRow       Json           @map("raw_row")
+  errorMessage String         @map("error_message")
+  errorType    String?        @map("error_type")
+  fieldErrors  Json?          @map("field_errors")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  import       EnquiryImport  @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  @@map("enquiry_import_errors")
 }
 
 model BookingAuditLog {
@@ -397,12 +438,16 @@ enum EnquirySource {
   WALK_IN
   PHONE_CALL
   WEBSITE
+  DIGITAL
   SOCIAL_MEDIA
   REFERRAL
   ADVERTISEMENT
   EMAIL
   SHOWROOM_VISIT
   EVENT
+  BTL_ACTIVITY
+  WHATSAPP
+  OUTBOUND_CALL
   OTHER
 }
 
@@ -450,9 +495,14 @@ model Remark {
   createdBy     String   // User ID who created the remark
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  isCancelled   Boolean  @default(false) @map("is_cancelled")
+  cancellationReason String? @map("cancellation_reason")
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledBy   String?   @map("cancelled_by")
   
   // Relations
   user          User     @relation("RemarkAuthor", fields: [createdBy], references: [firebaseUid])
+  cancelledByUser User?  @relation("RemarkCanceller", fields: [cancelledBy], references: [firebaseUid])
   enquiry       Enquiry? @relation(fields: [entityId], references: [id], map: "remark_enquiry_fkey")
   booking       Booking? @relation(fields: [entityId], references: [id], map: "remark_booking_fkey")
   

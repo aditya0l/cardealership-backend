@@ -3,7 +3,8 @@ import {
   getRevenueChartData,
   getSalesPerformance,
   getRecentActivities,
-  getDashboardStats
+  getDashboardStats,
+  getTodaysBookingPlan
 } from '../controllers/dashboard.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 
@@ -17,6 +18,7 @@ router.get('/stats', getDashboardStats);
 router.get('/revenue-chart', getRevenueChartData);
 router.get('/sales-performance', getSalesPerformance);
 router.get('/recent-activities', getRecentActivities);
+router.get('/booking-plan/today', getTodaysBookingPlan);
 
 export default router;
 

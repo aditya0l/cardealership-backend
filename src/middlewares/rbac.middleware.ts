@@ -77,8 +77,9 @@ export const ROLE_PERMISSIONS: Record<RoleName, RolePermissions> = {
     'financerName': { read: true, write: true },          // ✅ Editable
     'fileLoginDate': { read: true, write: true },         // ✅ Editable
     'approvalDate': { read: true, write: true },          // ✅ Editable
-    'stockAvailability': { read: true, write: true },     // ✅ Editable (enum: VNA, VEHICLE_AVAILABLE)
-    'backOrderStatus': { read: true, write: true },       // ✅ Editable
+    'stockAvailability': { read: true, write: false },    // Read-only, admin manages stock availability
+    'chassisNumber': { read: true, write: false },
+    'allocationOrderNumber': { read: true, write: false },
     'rtoDate': { read: true, write: true },               // ✅ Editable
     
     // Vehicle information (read only)

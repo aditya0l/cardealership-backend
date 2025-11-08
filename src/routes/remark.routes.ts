@@ -4,7 +4,9 @@ import {
   getRemarksHistory, 
   updateStatusWithRemark, 
   getTeamEntitiesWithRemarks,
-  getRemarkStats
+  getRemarkStats,
+  cancelRemark,
+  getPendingUpdatesSummary
 } from '../controllers/remark.controller';
 import { authenticate } from '../middlewares/auth.middleware';
 
@@ -13,11 +15,17 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Add remark to enquiry or booking
-router.post('/:entityType/:entityId/remarks', addRemark);
+// Cancel a remark with reason
+router.post('/remarks/:remarkId/cancel', cancelRemark);
+
+// Pending updates summary for current user
+router.get('/pending/summary', getPendingUpdatesSummary);
 
 // Get remarks history for enquiry or booking
 router.get('/:entityType/:entityId/remarks/history', getRemarksHistory);
+
+// Add remark to enquiry or booking
+router.post('/:entityType/:entityId/remarks', addRemark);
 
 // Update status with remark
 router.patch('/:entityType/:entityId/status', updateStatusWithRemark);

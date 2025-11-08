@@ -10,28 +10,34 @@ enum EnquirySource {
   WALK_IN = 'WALK_IN',
   PHONE_CALL = 'PHONE_CALL',
   WEBSITE = 'WEBSITE',
+  DIGITAL = 'DIGITAL',
   SOCIAL_MEDIA = 'SOCIAL_MEDIA',
   REFERRAL = 'REFERRAL',
   ADVERTISEMENT = 'ADVERTISEMENT',
   EMAIL = 'EMAIL',
   SHOWROOM_VISIT = 'SHOWROOM_VISIT',
   EVENT = 'EVENT',
+  BTL_ACTIVITY = 'BTL_ACTIVITY',
+  WHATSAPP = 'WHATSAPP',
+  OUTBOUND_CALL = 'OUTBOUND_CALL',
   OTHER = 'OTHER'
 }
 
 interface CreateEnquiryRequest {
   customerName: string;
   customerContact: string;
-  customerEmail: string;
+  customerEmail?: string;
   model?: string;
   variant?: string;
   color?: string;
   source?: EnquirySource;
-  expectedBookingDate?: string;
+  expectedBookingDate: string;
   caRemarks?: string;
   assignedToUserId?: string;
   category?: EnquiryCategory;
   dealerCode?: string;
+  location?: string;
+  nextFollowUpDate?: string;
 }
 
 interface UpdateEnquiryRequest {
@@ -48,6 +54,8 @@ interface UpdateEnquiryRequest {
   assignedToUserId?: string;
   category?: EnquiryCategory;
   dealerCode?: string;
+  location?: string;
+  nextFollowUpDate?: string;
 }
 
 export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
@@ -63,18 +71,26 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     caRemarks, 
     assignedToUserId,
     category,
-    dealerCode
+    dealerCode,
+    location,
+    nextFollowUpDate
   }: CreateEnquiryRequest = req.body;
 
   // Validate required fields
-  if (!customerName || !customerContact || !customerEmail) {
-    throw createError('Customer name, contact, and email are required', 400);
+  if (!customerName || !customerContact) {
+    throw createError('Customer name and contact are required', 400);
   }
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(customerEmail)) {
-    throw createError('Invalid email format', 400);
+  if (!expectedBookingDate) {
+    throw createError('Expected booking date is required', 400);
+  }
+
+  // Validate email format if provided
+  if (customerEmail) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail)) {
+      throw createError('Invalid email format', 400);
+    }
   }
 
   // Validate phone number format (basic validation)
@@ -92,14 +108,37 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     if (!assignedUser) {
       throw createError('Assigned user not found', 404);
     }
+    if (req.user.dealershipId && assignedUser.dealershipId && req.user.dealershipId !== assignedUser.dealershipId) {
+      throw createError('Assigned user belongs to a different dealership', 403);
+    }
+  }
+
+  if (source && !Object.values(EnquirySource).includes(source)) {
+    throw createError('Invalid enquiry source', 400);
   }
 
   // Parse expected booking date if provided
-  let parsedBookingDate: Date | undefined;
-  if (expectedBookingDate) {
-    parsedBookingDate = new Date(expectedBookingDate);
-    if (isNaN(parsedBookingDate.getTime())) {
-      throw createError('Invalid expected booking date format', 400);
+  const parsedBookingDate = new Date(expectedBookingDate);
+  if (isNaN(parsedBookingDate.getTime())) {
+    throw createError('Invalid expected booking date format', 400);
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (parsedBookingDate < today) {
+    throw createError('Expected booking date cannot be in the past', 400);
+  }
+
+  let parsedNextFollowUpDate: Date | undefined;
+  if (nextFollowUpDate) {
+    parsedNextFollowUpDate = new Date(nextFollowUpDate);
+    if (isNaN(parsedNextFollowUpDate.getTime())) {
+      throw createError('Invalid next follow up date format', 400);
+    }
+    const nextFollowUpStart = new Date(parsedNextFollowUpDate);
+    nextFollowUpStart.setHours(0, 0, 0, 0);
+    if (nextFollowUpStart < today) {
+      throw createError('Next follow up date cannot be before today', 400);
     }
   }
 
@@ -109,23 +148,27 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   // Create enquiry with proper schema fields
+  const enquiryData: any = {
+    customerName,
+    customerContact,
+    customerEmail: customerEmail ?? undefined,
+    model,
+    variant,
+    color,
+    source: (source || EnquirySource.WALK_IN) as any,
+    expectedBookingDate: parsedBookingDate,
+    caRemarks,
+    assignedToUserId,
+    createdByUserId: req.user.firebaseUid,
+    category: category || EnquiryCategory.HOT,
+    dealerCode: dealerCode || 'DEFAULT001',
+    location: location || null,
+    nextFollowUpDate: parsedNextFollowUpDate || parsedBookingDate,
+    dealershipId: req.user.dealershipId
+  };
+
   const enquiry = await prisma.enquiry.create({
-    data: {
-      customerName,
-      customerContact,
-      customerEmail,
-      model,
-      variant,
-      color,
-      source: source || EnquirySource.WALK_IN,
-      expectedBookingDate: parsedBookingDate,
-      caRemarks,
-      assignedToUserId,
-      createdByUserId: req.user.firebaseUid,
-      category: category || EnquiryCategory.HOT,  // Default to HOT
-      dealerCode: dealerCode || 'DEFAULT001',  // Default dealer if not provided
-      dealershipId: req.user.dealershipId  // CRITICAL: Assign to user's dealership
-    },
+    data: enquiryData,
     include: {
       assignedTo: {
         select: {
@@ -271,7 +314,26 @@ export const getEnquiryById = asyncHandler(async (req: AuthenticatedRequest, res
         }
       },
       bookings: true,
-      quotations: true
+      quotations: true,
+      remarkHistory: {
+        where: {
+          isCancelled: false
+        } as any,
+        orderBy: { createdAt: 'desc' },
+        take: 3,
+        include: {
+          user: {
+            select: {
+              firebaseUid: true,
+              name: true,
+              email: true,
+              role: {
+                select: { name: true }
+              }
+            }
+          }
+        }
+      }
     }
   });
 
@@ -308,7 +370,10 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
     caRemarks, 
     status, 
     assignedToUserId,
-    category
+    category,
+    dealerCode,
+    location,
+    nextFollowUpDate
   }: UpdateEnquiryRequest = req.body;
 
   // Check if enquiry exists
@@ -326,12 +391,29 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
   // Update direct fields
   if (customerName !== undefined) updateFields.customerName = customerName;
   if (customerContact !== undefined) updateFields.customerContact = customerContact;
-  if (customerEmail !== undefined) updateFields.customerEmail = customerEmail;
+  if (customerEmail !== undefined) {
+    if (customerEmail) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(customerEmail)) {
+        throw createError('Invalid email format', 400);
+      }
+      updateFields.customerEmail = customerEmail as any;
+    } else {
+      updateFields.customerEmail = null as any;
+    }
+  }
   if (model !== undefined) updateFields.model = model;
   if (variant !== undefined) updateFields.variant = variant;
   if (color !== undefined) updateFields.color = color;
-  if (source !== undefined) updateFields.source = source;
+  if (source !== undefined) {
+    if (!Object.values(EnquirySource).includes(source)) {
+      throw createError('Invalid enquiry source', 400);
+    }
+    updateFields.source = source as any;
+  }
   if (caRemarks !== undefined) updateFields.caRemarks = caRemarks;
+  if (dealerCode !== undefined) updateFields.dealerCode = dealerCode;
+  if (location !== undefined) updateFields.location = location ?? null;
   
   // Parse expected booking date if provided
   if (expectedBookingDate) {
@@ -339,12 +421,48 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
     if (isNaN(date.getTime())) {
       throw createError('Invalid expected booking date format', 400);
     }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (date < today) {
+      throw createError('Expected booking date cannot be in the past', 400);
+    }
     updateFields.expectedBookingDate = date;
+  }
+
+  if (nextFollowUpDate !== undefined) {
+    if (nextFollowUpDate) {
+      const parsedNextFollowUp = new Date(nextFollowUpDate);
+      if (isNaN(parsedNextFollowUp.getTime())) {
+        throw createError('Invalid next follow up date format', 400);
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      parsedNextFollowUp.setHours(0, 0, 0, 0);
+      if (parsedNextFollowUp < today) {
+        throw createError('Next follow up date cannot be before today', 400);
+      }
+      updateFields.nextFollowUpDate = parsedNextFollowUp;
+    } else {
+      updateFields.nextFollowUpDate = null;
+    }
   }
   
   // Update other fields
   if (status !== undefined) updateFields.status = status;
-  if (assignedToUserId !== undefined) updateFields.assignedToUserId = assignedToUserId;
+  if (assignedToUserId !== undefined) {
+    if (assignedToUserId) {
+      const assignedUser = await prisma.user.findUnique({
+        where: { firebaseUid: assignedToUserId }
+      });
+      if (!assignedUser) {
+        throw createError('Assigned user not found', 404);
+      }
+      if (assignedUser.dealershipId && existingEnquiry.dealershipId && assignedUser.dealershipId !== existingEnquiry.dealershipId) {
+        throw createError('Assigned user belongs to a different dealership', 403);
+      }
+    }
+    updateFields.assignedToUserId = assignedToUserId || null;
+  }
   
   // Validate and update category
   if (category !== undefined) {
@@ -402,7 +520,7 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
 
       if (!vehicleInStock) {
         throw createError(
-          `Vehicle variant "${enquiry.variant}" is not in stock. Cannot convert to booking. Please check stock availability or create with back-order status.`,
+          `Vehicle variant "${enquiry.variant}" is not in stock. Cannot convert to booking.`,
           400
         );
       }
@@ -435,7 +553,6 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
           bookingDate: new Date(),
           expectedDeliveryDate: enquiry.expectedBookingDate,
           stockAvailability: stockInfo ? 'VEHICLE_AVAILABLE' : undefined,  // Set stock status
-          backOrderStatus: false,  // Not a back order since stock is available
           remarks: `Auto-created from enquiry: ${enquiry.id}. ${enquiry.caRemarks || ''}${stockInfo ? '\nStock validated: Vehicle available in inventory.' : ''}`,
           dealershipId: enquiry.dealershipId  // CRITICAL: Inherit dealership from enquiry
         },
@@ -762,6 +879,25 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
             email: true
           }
         },
+        remarkHistory: {
+          where: {
+            isCancelled: false
+          } as any,
+          orderBy: { createdAt: 'desc' },
+          take: 3,
+          include: {
+            user: {
+              select: {
+                firebaseUid: true,
+                name: true,
+                email: true,
+                role: {
+                  select: { name: true }
+                }
+              }
+            }
+          }
+        },
         _count: {
           select: {
             bookings: true,
@@ -849,7 +985,7 @@ export const bulkDownloadEnquiries = asyncHandler(async (req: AuthenticatedReque
       'Enquiry ID': enquiry.id,
       'Customer Name': enquiry.customerName,
       'Customer Contact': enquiry.customerContact,
-      'Customer Email': enquiry.customerEmail,
+      'Customer Email': enquiry.customerEmail || '',
       'Status': enquiry.status,
       'Category': enquiry.category,
       'Model': enquiry.model || '',
@@ -857,6 +993,7 @@ export const bulkDownloadEnquiries = asyncHandler(async (req: AuthenticatedReque
       'Color': enquiry.color || '',
       'Source': enquiry.source,
       'Dealer Code': enquiry.dealerCode || '',
+      'Location': (enquiry as any).location || '',
       'Expected Booking Date': enquiry.expectedBookingDate ? new Date(enquiry.expectedBookingDate).toLocaleDateString() : '',
       'Created By': enquiry.createdBy?.name || '',
       'Created By Email': enquiry.createdBy?.email || '',
@@ -891,6 +1028,7 @@ export const bulkDownloadEnquiries = asyncHandler(async (req: AuthenticatedReque
       { wch: 12 }, // Color
       { wch: 15 }, // Source
       { wch: 12 }, // Dealer Code
+      { wch: 18 }, // Location
       { wch: 18 }, // Expected Booking Date
       { wch: 20 }, // Created By
       { wch: 25 }, // Created By Email
