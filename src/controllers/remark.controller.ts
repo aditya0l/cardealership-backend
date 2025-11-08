@@ -62,24 +62,27 @@ const updateEntityRemarkSnapshot = async (
     return;
   }
 
-  // Booking snapshot update
-  const remarkFieldMap: Record<string, keyof any> = {
-    ca_remarks: 'advisorRemarks',
-    advisor_remarks: 'advisorRemarks',
-    follow_up: 'advisorRemarks',
-    tl_remarks: 'teamLeadRemarks',
-    sm_remarks: 'salesManagerRemarks',
-    gm_remarks: 'generalManagerRemarks',
-    admin_remarks: 'adminRemarks',
-    escalation: 'remarks',
-    status_update: 'remarks'
-  };
+// Booking snapshot update
+const remarkFieldMap: Record<
+  string,
+  'advisorRemarks' | 'teamLeadRemarks' | 'salesManagerRemarks' | 'generalManagerRemarks' | 'adminRemarks' | 'remarks'
+> = {
+  ca_remarks: 'advisorRemarks',
+  advisor_remarks: 'advisorRemarks',
+  follow_up: 'advisorRemarks',
+  tl_remarks: 'teamLeadRemarks',
+  sm_remarks: 'salesManagerRemarks',
+  gm_remarks: 'generalManagerRemarks',
+  admin_remarks: 'adminRemarks',
+  escalation: 'remarks',
+  status_update: 'remarks'
+};
 
   const typesToUpdate = remarkType ? [remarkType] : Object.keys(remarkFieldMap);
   const updateData: Record<string, string | null> = {};
 
   for (const type of typesToUpdate) {
-    const fieldName = remarkFieldMap[type] || 'remarks';
+    const fieldName = remarkFieldMap[type as keyof typeof remarkFieldMap] || 'remarks';
     const latestRemark = await prisma.remark.findFirst({
       where: {
         entityType: 'booking',

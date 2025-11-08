@@ -5,7 +5,7 @@ import fs from 'fs';
 import prisma from '../config/db';
 import { asyncHandler, createError } from '../middlewares/error.middleware';
 import { AuthenticatedRequest } from '../middlewares/auth.middleware';
-import { ImportStatus } from '@prisma/client';
+import { ImportStatus, Prisma } from '@prisma/client';
 import { EnquiryImportService } from '../services/enquiry-import.service';
 
 const storage = multer.diskStorage({
@@ -110,6 +110,8 @@ export const uploadEnquiryImportFile = [
     try {
       const parsed = await parseImportFile(filePath);
 
+      const serializedParseErrors = JSON.parse(JSON.stringify(parsed.errors)) as Prisma.InputJsonValue;
+
       await prisma.enquiryImport.update({
         where: { id: importRecord.id },
         data: {
@@ -117,7 +119,7 @@ export const uploadEnquiryImportFile = [
           processedRows: parsed.totalRows,
           successfulRows: parsed.validRows.length,
           failedRows: parsed.errors.length,
-          errorSummary: parsed.errors,
+          errorSummary: serializedParseErrors,
           status: ImportStatus.PROCESSING,
           startedAt: new Date()
         }
@@ -130,6 +132,8 @@ export const uploadEnquiryImportFile = [
         user.dealershipId
       );
 
+      const combinedErrors = JSON.parse(JSON.stringify([...parsed.errors, ...errors])) as Prisma.InputJsonValue;
+
       await prisma.enquiryImport.update({
         where: { id: importRecord.id },
         data: {
@@ -138,7 +142,7 @@ export const uploadEnquiryImportFile = [
           processedRows: parsed.totalRows,
           status: failed + parsed.errors.length > 0 ? ImportStatus.COMPLETED : ImportStatus.COMPLETED,
           completedAt: new Date(),
-          errorSummary: [...parsed.errors, ...errors]
+          errorSummary: combinedErrors
         }
       });
 
@@ -160,10 +164,15 @@ export const uploadEnquiryImportFile = [
         where: { id: importRecord.id },
         data: {
           status: ImportStatus.FAILED,
-          errorSummary: [
-            ...(importRecord.errorSummary as any || []),
-            { message: error.message || 'Import failed' }
-          ],
+          errorSummary: (() => {
+            const existing = (importRecord.errorSummary ?? []) as Prisma.InputJsonValue;
+            const normalized = Array.isArray(existing) ? existing : [];
+            const next = [
+              ...JSON.parse(JSON.stringify(normalized)),
+              { message: error.message || 'Import failed' }
+            ];
+            return next as Prisma.InputJsonValue;
+          })(),
           completedAt: new Date()
         }
       });
