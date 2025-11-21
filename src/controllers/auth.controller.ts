@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { auth } from '../config/firebase';
 import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
-import { AuthenticatedRequest, setUserClaims } from '../middlewares/auth.middleware';
+import { AuthenticatedRequest, setUserClaims, resolveDealershipContext } from '../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
 import { canPerformAction } from '../middlewares/rbac.middleware';
 import { generateEmployeeId } from '../utils/employee-id-generator';
@@ -24,7 +24,7 @@ interface CreateUserRequest {
 interface SyncUserRequest {
   name: string;
   email: string;
-  roleName: RoleName;
+  roleName?: RoleName;
 }
 
 interface UpdateUserRoleRequest {
@@ -41,27 +41,32 @@ export const syncUser = asyncHandler(async (req: AuthenticatedRequest, res: Resp
   const { name, email, roleName }: SyncUserRequest = req.body;
   const firebaseUid = req.user.firebaseUid;
 
-  // Validate input
-  if (!name || !email || !roleName) {
-    throw createError('Name, email, and role are required', 400);
+  if (!name || !email) {
+    throw createError('Name and email are required', 400);
   }
 
-  // Get role
+  const existingUser = await prisma.user.findUnique({
+    where: { firebaseUid },
+    include: {
+      role: true
+    }
+  });
+
+  const resolvedRoleName: RoleName =
+    roleName ||
+    existingUser?.role?.name ||
+    req.user.role?.name ||
+    RoleName.CUSTOMER_ADVISOR;
+
   const role = await prisma.role.findUnique({
-    where: { name: roleName }
+    where: { name: resolvedRoleName }
   });
 
   if (!role) {
     throw createError('Invalid role specified', 400);
   }
 
-  // Check if user already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { firebaseUid }
-  });
-
   if (existingUser) {
-    // Update existing user
     const user = await prisma.user.update({
       where: { firebaseUid },
       data: {
@@ -74,7 +79,6 @@ export const syncUser = asyncHandler(async (req: AuthenticatedRequest, res: Resp
       }
     });
 
-    // Set custom claims in Firebase
     await setUserClaims(firebaseUid, {
       role: role.name,
       roleId: role.id
@@ -85,32 +89,31 @@ export const syncUser = asyncHandler(async (req: AuthenticatedRequest, res: Resp
       message: 'User updated successfully',
       data: { user }
     });
-  } else {
-    // Create new user
-    const user = await prisma.user.create({
-      data: {
-        firebaseUid,
-        name,
-        email,
-        roleId: role.id
-      },
-      include: {
-        role: true
-      }
-    });
-
-    // Set custom claims in Firebase
-    await setUserClaims(firebaseUid, {
-      role: role.name,
-      roleId: role.id
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'User synced successfully',
-      data: { user }
-    });
+    return;
   }
+
+  const user = await prisma.user.create({
+    data: {
+      firebaseUid,
+      name,
+      email,
+      roleId: role.id
+    },
+    include: {
+      role: true
+    }
+  });
+
+  await setUserClaims(firebaseUid, {
+    role: role.name,
+    roleId: role.id
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'User synced successfully',
+    data: { user }
+  });
 });
 
 // Admin endpoint to create user with credentials
@@ -305,6 +308,33 @@ export const getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Re
     throw createError('User not found', 404);
   }
 
+  const dealershipContext = await resolveDealershipContext(user.dealershipId ?? req.user.legacyDealershipId);
+
+  const responseDealership = user.dealership
+    ? {
+        id: dealershipContext.dealershipUuid ?? user.dealership.id,
+        uuid: dealershipContext.dealershipUuid ?? user.dealership.id,
+        cuid: user.dealership.id,
+        legacyId: user.dealership.id,
+        name: user.dealership.name,
+        code: user.dealership.code,
+        type: user.dealership.type,
+        email: user.dealership.email,
+        phone: user.dealership.phone,
+        address: user.dealership.address,
+        city: user.dealership.city,
+        state: user.dealership.state,
+        pincode: user.dealership.pincode,
+        gstNumber: user.dealership.gstNumber,
+        panNumber: user.dealership.panNumber,
+        brands: user.dealership.brands,
+        isActive: user.dealership.isActive,
+        onboardingCompleted: user.dealership.onboardingCompleted,
+        createdAt: user.dealership.createdAt,
+        updatedAt: user.dealership.updatedAt
+      }
+    : null;
+
   res.json({
     success: true,
     message: 'Profile retrieved successfully',
@@ -317,8 +347,10 @@ export const getProfile = asyncHandler(async (req: AuthenticatedRequest, res: Re
           id: user.role.id,
           name: user.role.name
         },
-        dealershipId: user.dealershipId,
-        dealership: user.dealership, // Now included!
+        dealershipId: dealershipContext.dealershipUuid,
+        legacyDealershipId: dealershipContext.dealershipLegacyId,
+        dealershipCode: dealershipContext.dealershipCode ?? user.dealership?.code ?? null,
+        dealership: responseDealership,
         isActive: user.isActive,
         employeeId: user.employeeId
       }

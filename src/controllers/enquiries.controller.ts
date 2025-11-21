@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/db';
 import { createError, asyncHandler } from '../middlewares/error.middleware';
-import { AuthenticatedRequest } from '../middlewares/auth.middleware';
+import { AuthenticatedRequest, resolveDealershipContext } from '../middlewares/auth.middleware';
 import { EnquiryStatus, EnquiryCategory } from '@prisma/client';
 import NotificationTriggerService from '../services/notification-trigger.service';
 
@@ -147,6 +147,17 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     throw createError('Invalid category. Must be HOT, LOST, or BOOKED', 400);
   }
 
+  const dealershipContext = await resolveDealershipContext(
+    req.user.legacyDealershipId ?? req.user.dealershipId
+  );
+
+  const resolvedDealershipId = req.user.dealershipId ?? dealershipContext.dealershipUuid;
+  if (!resolvedDealershipId) {
+    throw createError('Unable to determine dealership for the current user', 403);
+  }
+
+  const resolvedDealerCode = dealerCode ?? req.user.dealershipCode ?? dealershipContext.dealershipCode ?? undefined;
+
   // Create enquiry with proper schema fields
   const enquiryData: any = {
     customerName,
@@ -161,10 +172,10 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     assignedToUserId,
     createdByUserId: req.user.firebaseUid,
     category: category || EnquiryCategory.HOT,
-    dealerCode: dealerCode || 'DEFAULT001',
+    dealerCode: resolvedDealerCode ?? null,
     location: location || null,
     nextFollowUpDate: parsedNextFollowUpDate || parsedBookingDate,
-    dealershipId: req.user.dealershipId
+    dealershipId: resolvedDealershipId
   };
 
   const enquiry = await prisma.enquiry.create({
@@ -356,7 +367,7 @@ export const getEnquiryById = asyncHandler(async (req: AuthenticatedRequest, res
   });
 });
 
-export const updateEnquiry = asyncHandler(async (req: Request, res: Response) => {
+export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   const { 
     customerName, 
@@ -384,6 +395,10 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
   if (!existingEnquiry) {
     throw createError('Enquiry not found', 404);
   }
+
+  const dealershipContext = await resolveDealershipContext(
+    req.user.legacyDealershipId ?? req.user.dealershipId
+  );
 
   // Build update object with direct fields
   const updateFields: any = {};
@@ -535,7 +550,12 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
 
     if (!existingBooking) {
       // Get dealerCode from enquiry (either updated or existing)
-      const finalDealerCode = updateFields.dealerCode || existingEnquiry.dealerCode || 'DEFAULT001';
+      const finalDealerCode =
+        updateFields.dealerCode ??
+        existingEnquiry.dealerCode ??
+        req.user.dealershipCode ??
+        dealershipContext.dealershipCode ??
+        null;
 
       // Create booking from enquiry with stock information
       booking = await prisma.booking.create({
@@ -545,7 +565,7 @@ export const updateEnquiry = asyncHandler(async (req: Request, res: Response) =>
           customerEmail: enquiry.customerEmail,
           variant: enquiry.variant,
           color: enquiry.color,
-          dealerCode: finalDealerCode,
+          dealerCode: finalDealerCode ?? undefined,
           advisorId: enquiry.createdByUserId,  // Assign to enquiry creator
           enquiryId: enquiry.id,  // Link to source enquiry
           source: 'MOBILE',  // Mark as mobile-created

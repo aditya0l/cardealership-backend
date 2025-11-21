@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { auth } from '../config/firebase';
 import prisma from '../config/db';
-import { RoleName } from '@prisma/client';
+import { Prisma, RoleName } from '@prisma/client';
+import { validateUUID } from '../utils/validators';
 
 export interface AuthenticatedUser {
   firebaseUid: string;
@@ -11,9 +12,74 @@ export interface AuthenticatedUser {
     id: string;
     name: RoleName;
   };
-  dealershipId?: string | null; // Multi-dealership support
+  dealershipId?: string | null; // Primary dealership identifier (UUID when available)
+  legacyDealershipId?: string | null; // Legacy CUID identifier retained for backwards compatibility
+  dealershipCode?: string | null; // Dealership code (e.g. CITY01)
   customClaims?: Record<string, any>;
 }
+export const resolveDealershipContext = async (
+  dealershipId?: string | null
+): Promise<{
+  dealershipUuid: string | null;
+  dealershipLegacyId: string | null;
+  dealershipCode: string | null;
+}> => {
+  if (!dealershipId) {
+    return {
+      dealershipUuid: null,
+      dealershipLegacyId: null,
+      dealershipCode: null
+    };
+  }
+
+  let dealershipUuid: string | null = null;
+  let dealershipCode: string | null = null;
+  let legacyDealershipId: string | null = null;
+
+  try {
+    const rows = await prisma.$queryRaw<{ uuid: string | null; code: string | null }[]>(
+      Prisma.sql`SELECT "uuid", "code" FROM "dealerships" WHERE "id" = ${dealershipId} LIMIT 1`
+    );
+
+    if (rows && rows.length > 0) {
+      dealershipUuid = rows[0]?.uuid ?? null;
+      dealershipCode = rows[0]?.code ?? null;
+      legacyDealershipId = dealershipId;
+    }
+  } catch (error) {
+    console.warn('Unable to resolve dealership UUID via legacy ID lookup. Falling back to additional strategies.', error);
+  }
+
+  if ((!dealershipUuid || !legacyDealershipId) && dealershipId && validateUUID(dealershipId)) {
+    try {
+      const rows = await prisma.$queryRaw<{ uuid: string | null; code: string | null; id: string | null }[]>(
+        Prisma.sql`SELECT "uuid", "code", "id" FROM "dealerships" WHERE "uuid" = ${dealershipId} LIMIT 1`
+      );
+
+      if (rows && rows.length > 0) {
+        dealershipUuid = rows[0]?.uuid ?? dealershipId;
+        dealershipCode = rows[0]?.code ?? dealershipCode ?? null;
+        legacyDealershipId = rows[0]?.id ?? legacyDealershipId;
+      }
+    } catch (error) {
+      console.warn('Unable to resolve dealership UUID via UUID lookup. Falling back to provided identifier.', error);
+    }
+  }
+
+  if (!dealershipUuid) {
+    dealershipUuid = dealershipId;
+  }
+
+  if (!legacyDealershipId) {
+    legacyDealershipId = dealershipId;
+  }
+
+  return {
+    dealershipUuid,
+    dealershipLegacyId: legacyDealershipId,
+    dealershipCode
+  };
+};
 
 export interface AuthenticatedRequest extends Request {
   user: AuthenticatedUser;
@@ -55,6 +121,8 @@ export const authenticate = async (
       }
       
       if (testUser) {
+        const dealershipContext = await resolveDealershipContext(testUser.dealershipId);
+
         (req as AuthenticatedRequest).user = {
           firebaseUid: testUser.firebaseUid,
           email: testUser.email,
@@ -62,7 +130,10 @@ export const authenticate = async (
           role: {
             id: testUser.role.id,
             name: testUser.role.name
-          }
+          },
+          dealershipId: dealershipContext.dealershipUuid,
+          legacyDealershipId: dealershipContext.dealershipLegacyId,
+          dealershipCode: dealershipContext.dealershipCode
         };
         next();
         return;
@@ -379,6 +450,8 @@ export const authenticate = async (
       return;
     }
 
+    const dealershipContext = await resolveDealershipContext(user.dealershipId);
+
     (req as AuthenticatedRequest).user = {
       firebaseUid: user.firebaseUid,
       email: user.email,
@@ -387,7 +460,9 @@ export const authenticate = async (
         id: user.role.id,
         name: user.role.name
       },
-      dealershipId: user.dealershipId,
+      dealershipId: dealershipContext.dealershipUuid,
+      legacyDealershipId: dealershipContext.dealershipLegacyId,
+      dealershipCode: dealershipContext.dealershipCode,
       customClaims: decodedToken.customClaims || {}
     };
 

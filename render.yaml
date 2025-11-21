@@ -6,7 +6,7 @@ services:
     region: singapore
     plan: free
     buildCommand: npm install && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && npm start
+    startCommand: node scripts/start-production.js
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
