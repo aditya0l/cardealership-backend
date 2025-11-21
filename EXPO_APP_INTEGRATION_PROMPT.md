@@ -11,17 +11,15 @@ I'm building a React Native/Expo mobile app for a car dealership management syst
 
 ## 🔗 BACKEND API DETAILS
 
-**API Base URL (Production):**
+**API Base URL (Local Development):**
 ```
-https://automotive-backend-frqe.onrender.com/api
+http://YOUR_LOCAL_IP:4000/api
 ```
 
-**API Base URL (Development):**
-```
-http://localhost:4000/api
-// OR
-http://10.69.245.247:4000/api (if on local network)
-```
+**To find your local IP:**
+- Run `npm run local-ip` in the backend directory
+- Or use: `ifconfig | grep "inet " | grep -v 127.0.0.1`
+- Common format: `http://192.168.x.x:4000/api` or `http://10.0.x.x:4000/api`
 
 **Authentication:**
 - Uses Firebase Authentication with ID tokens
