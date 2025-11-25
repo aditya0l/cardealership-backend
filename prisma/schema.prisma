@@ -16,22 +16,22 @@ model Role {
 }
 
 model User {
-  firebaseUid       String            @id
-  employeeId        String?           @unique @map("employee_id") // Custom ID: EMP001, ADV001, etc.
-  name              String
-  email             String            @unique
-  roleId            String
-  dealershipId      String?           @map("dealership_id") // Multi-dealership support
-  managerId         String?           @map("manager_id")
-  isActive          Boolean           @default(true)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  
+  firebaseUid  String   @id
+  employeeId   String?  @unique @map("employee_id") // Custom ID: EMP001, ADV001, etc.
+  name         String
+  email        String   @unique
+  roleId       String
+  dealershipId String?  @map("dealership_id") // Multi-dealership support
+  managerId    String?  @map("manager_id")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   // FCM Notification fields
-  fcmToken          String?           @map("fcm_token")
-  deviceType        String?           @map("device_type") // 'android' or 'ios'
-  lastTokenUpdated  DateTime?         @map("last_token_updated")
-  
+  fcmToken         String?   @map("fcm_token")
+  deviceType       String?   @map("device_type") // 'android' or 'ios'
+  lastTokenUpdated DateTime? @map("last_token_updated")
+
   // Relations
   auditLogs         BookingAuditLog[] @relation("AuditLogs")
   adminImports      BookingImport[]   @relation("AdminImports")
@@ -70,57 +70,58 @@ model Enquiry {
   dealerCode          String?         @map("dealer_code")
   location            String?
   dealershipId        String?         @map("dealership_id") // Multi-tenant dealership
-  
+
   // Follow-up tracking fields
-  lastFollowUpDate    DateTime?       @map("last_follow_up_date")
-  followUpCount       Int             @default(0) @map("follow_up_count")
-  nextFollowUpDate    DateTime?       @map("next_follow_up_date")
-  
+  lastFollowUpDate DateTime? @map("last_follow_up_date")
+  followUpCount    Int       @default(0) @map("follow_up_count")
+  nextFollowUpDate DateTime? @map("next_follow_up_date")
+
   // Relations
-  bookings            Booking[]
-  remarkHistory       Remark[]
-  assignedTo          User?           @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
-  createdBy           User            @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
-  dealership          Dealership?     @relation("DealershipEnquiries", fields: [dealershipId], references: [id])
-  quotations          Quotation[]
+  bookings      Booking[]
+  remarkHistory Remark[]    @relation("EnquiryRemarks")
+  assignedTo    User?       @relation("AssignedTo", fields: [assignedToUserId], references: [firebaseUid])
+  createdBy     User        @relation("CreatedBy", fields: [createdByUserId], references: [firebaseUid])
+  dealership    Dealership? @relation("DealershipEnquiries", fields: [dealershipId], references: [id])
+  quotations    Quotation[]
 
   @@map("enquiries")
 }
 
 model Booking {
-  id                   String             @id @default(cuid())
-  customerName         String             @map("customer_name")
-  status               BookingStatus      @default(PENDING)
-  enquiryId            String?            @map("enquiry_id")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
-  customerPhone        String?            @map("customer_phone")
-  customerEmail        String?            @map("customer_email")
-  dealerId             String?            @map("dealer_id")
-  advisorId            String?            @map("advisor_id")
-  bookingDate          DateTime?          @map("booking_date")
-  source               BookingSource      @default(MANUAL)
-  metadata             Json?
-  zone                 String?
-  region               String?
-  optyId               String?            @unique @map("opty_id")
-  variant              String?
-  vcCode               String?            @map("vc_code")
-  color                String?
-  fuelType             String?            @map("fuel_type")
-  transmission         String?
-  expectedDeliveryDate DateTime?          @map("expected_delivery_date")
-  division             String?
-  empName              String?            @map("emp_name")
-  employeeLogin        String?            @map("employee_login")
-  financeRequired      Boolean?           @map("finance_required")
-  financerName         String?            @map("financer_name")
-  fileLoginDate        DateTime?          @map("file_login_date")
-  approvalDate         DateTime?          @map("approval_date")
-  stockAvailability    StockAvailability? @map("stock_availability")
-  chassisNumber        String?            @map("chassis_number")
-  allocationOrderNumber String?           @map("allocation_order_number")
-  rtoDate              DateTime?          @map("rto_date")
+  id                    String             @id @default(cuid())
+  customerName          String             @map("customer_name")
+  status                BookingStatus      @default(PENDING)
+  enquiryId             String?            @map("enquiry_id")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  customerPhone         String?            @map("customer_phone")
+  customerEmail         String?            @map("customer_email")
+  dealerId              String?            @map("dealer_id")
+  advisorId             String?            @map("advisor_id")
+  bookingDate           DateTime?          @map("booking_date")
+  source                BookingSource      @default(MANUAL)
+  metadata              Json?
+  zone                  String?
+  region                String?
+  optyId                String?            @unique @map("opty_id")
+  variant               String?
+  vcCode                String?            @map("vc_code")
+  color                 String?
+  fuelType              String?            @map("fuel_type")
+  transmission          String?
+  expectedDeliveryDate  DateTime?          @map("expected_delivery_date")
+  division              String?
+  empName               String?            @map("emp_name")
+  employeeLogin         String?            @map("employee_login")
+  financeRequired       Boolean?           @map("finance_required")
+  financerName          String?            @map("financer_name")
+  fileLoginDate         DateTime?          @map("file_login_date")
+  approvalDate          DateTime?          @map("approval_date")
+  stockAvailability     StockAvailability? @map("stock_availability")
+  chassisNumber         String?            @map("chassis_number")
+  allocationOrderNumber String?            @map("allocation_order_number")
+  rtoDate               DateTime?          @map("rto_date")
+  vahanDate             DateTime?          @map("vahan_date") // Vahan registration date
 
   // Role-specific remarks fields
   remarks               String? // Legacy/general remarks
@@ -130,21 +131,21 @@ model Booking {
   generalManagerRemarks String? @map("general_manager_remarks") // General Manager remarks
   adminRemarks          String? @map("admin_remarks") // Admin remarks
 
-  dealerCode   String            @map("dealer_code")
-  dealershipId String?           @map("dealership_id") // Multi-tenant dealership
-  
+  dealerCode   String  @map("dealer_code")
+  dealershipId String? @map("dealership_id") // Multi-tenant dealership
+
   // Follow-up tracking fields
-  lastFollowUpDate    DateTime?       @map("last_follow_up_date")
-  followUpCount       Int             @default(0) @map("follow_up_count")
-  nextFollowUpDate    DateTime?       @map("next_follow_up_date")
-  
+  lastFollowUpDate DateTime? @map("last_follow_up_date")
+  followUpCount    Int       @default(0) @map("follow_up_count")
+  nextFollowUpDate DateTime? @map("next_follow_up_date")
+
   // Relations
-  auditLogs    BookingAuditLog[]
-  remarkHistory Remark[]
-  advisor      User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
-  dealer       Dealer?           @relation(fields: [dealerId], references: [id])
-  dealership   Dealership?       @relation("DealershipBookings", fields: [dealershipId], references: [id])
-  enquiry      Enquiry?          @relation(fields: [enquiryId], references: [id])
+  auditLogs     BookingAuditLog[]
+  remarkHistory Remark[]          @relation("BookingRemarks")
+  advisor       User?             @relation("AdvisorBookings", fields: [advisorId], references: [firebaseUid])
+  dealer        Dealer?           @relation(fields: [dealerId], references: [id])
+  dealership    Dealership?       @relation("DealershipBookings", fields: [dealershipId], references: [id])
+  enquiry       Enquiry?          @relation(fields: [enquiryId], references: [id])
 
   @@map("bookings")
 }
@@ -251,38 +252,38 @@ model BookingImportError {
 }
 
 model EnquiryImport {
-  id               String             @id @default(cuid())
-  adminId          String             @map("admin_id")
+  id               String               @id @default(cuid())
+  adminId          String               @map("admin_id")
   filename         String
-  originalFilename String?            @map("original_filename")
-  fileSize         BigInt?            @map("file_size")
-  totalRows        Int                @default(0) @map("total_rows")
-  processedRows    Int                @default(0) @map("processed_rows")
-  successfulRows   Int                @default(0) @map("successful_rows")
-  failedRows       Int                @default(0) @map("failed_rows")
-  status           ImportStatus       @default(PENDING)
-  importSettings   Json?              @map("import_settings")
-  errorSummary     Json?              @map("error_summary")
-  startedAt        DateTime?          @map("started_at")
-  completedAt      DateTime?          @map("completed_at")
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
+  originalFilename String?              @map("original_filename")
+  fileSize         BigInt?              @map("file_size")
+  totalRows        Int                  @default(0) @map("total_rows")
+  processedRows    Int                  @default(0) @map("processed_rows")
+  successfulRows   Int                  @default(0) @map("successful_rows")
+  failedRows       Int                  @default(0) @map("failed_rows")
+  status           ImportStatus         @default(PENDING)
+  importSettings   Json?                @map("import_settings")
+  errorSummary     Json?                @map("error_summary")
+  startedAt        DateTime?            @map("started_at")
+  completedAt      DateTime?            @map("completed_at")
+  createdAt        DateTime             @default(now()) @map("created_at")
+  updatedAt        DateTime             @updatedAt @map("updated_at")
   errors           EnquiryImportError[]
-  admin            User               @relation("EnquiryAdminImports", fields: [adminId], references: [firebaseUid])
+  admin            User                 @relation("EnquiryAdminImports", fields: [adminId], references: [firebaseUid])
 
   @@map("enquiry_imports")
 }
 
 model EnquiryImportError {
-  id           String         @id @default(cuid())
-  importId     String         @map("import_id")
-  rowNumber    Int            @map("row_number")
-  rawRow       Json           @map("raw_row")
-  errorMessage String         @map("error_message")
-  errorType    String?        @map("error_type")
-  fieldErrors  Json?          @map("field_errors")
-  createdAt    DateTime       @default(now()) @map("created_at")
-  import       EnquiryImport  @relation(fields: [importId], references: [id], onDelete: Cascade)
+  id           String        @id @default(cuid())
+  importId     String        @map("import_id")
+  rowNumber    Int           @map("row_number")
+  rawRow       Json          @map("raw_row")
+  errorMessage String        @map("error_message")
+  errorType    String?       @map("error_type")
+  fieldErrors  Json?         @map("field_errors")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  import       EnquiryImport @relation(fields: [importId], references: [id], onDelete: Cascade)
 
   @@map("enquiry_import_errors")
 }
@@ -473,40 +474,43 @@ enum DealershipType {
 
 // Notification tracking model
 model NotificationLog {
-  id              String   @id @default(cuid())
-  userId          String
-  title           String
-  body            String
-  type            String   // 'enquiry_followup', 'booking_followup', etc.
-  entityId        String?  // enquiry ID or booking ID
-  sentAt          DateTime @default(now())
-  delivered       Boolean  @default(false)
-  user            User     @relation("NotificationLogs", fields: [userId], references: [firebaseUid])
-  
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  type      String // 'enquiry_followup', 'booking_followup', etc.
+  entityId  String? // enquiry ID or booking ID
+  sentAt    DateTime @default(now())
+  delivered Boolean  @default(false)
+  user      User     @relation("NotificationLogs", fields: [userId], references: [firebaseUid])
+
   @@map("notification_logs")
 }
 
 model Remark {
-  id            String   @id @default(cuid())
-  entityType    String   // 'enquiry' or 'booking'
-  entityId      String   // ID of enquiry or booking
-  remark        String   // The actual remark text
-  remarkType    String   // 'status_update', 'follow_up', 'escalation', 'ca_remarks', 'tl_remarks', etc.
-  createdBy     String   // User ID who created the remark
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  isCancelled   Boolean  @default(false) @map("is_cancelled")
-  cancellationReason String? @map("cancellation_reason")
-  cancelledAt   DateTime? @map("cancelled_at")
-  cancelledBy   String?   @map("cancelled_by")
-  
+  id                 String    @id @default(cuid())
+  remark             String // The actual remark text
+  remarkType         String    @map("remark_type") // 'status_update', 'follow_up', 'escalation', 'ca_remarks', 'tl_remarks', etc.
+  createdBy          String    @map("created_by") // User ID who created the remark
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  isCancelled        Boolean   @default(false) @map("is_cancelled")
+  cancellationReason String?   @map("cancellation_reason")
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancelledBy        String?   @map("cancelled_by")
+
+  // Separate fields for enquiries and bookings (no polymorphic relation)
+  enquiryId String? @map("enquiry_id")
+  bookingId String? @map("booking_id")
+
   // Relations
-  user          User     @relation("RemarkAuthor", fields: [createdBy], references: [firebaseUid])
-  cancelledByUser User?  @relation("RemarkCanceller", fields: [cancelledBy], references: [firebaseUid])
-  enquiry       Enquiry? @relation(fields: [entityId], references: [id], map: "remark_enquiry_fkey")
-  booking       Booking? @relation(fields: [entityId], references: [id], map: "remark_booking_fkey")
-  
-  @@index([entityType, entityId])
+  user            User     @relation("RemarkAuthor", fields: [createdBy], references: [firebaseUid])
+  cancelledByUser User?    @relation("RemarkCanceller", fields: [cancelledBy], references: [firebaseUid])
+  enquiry         Enquiry? @relation("EnquiryRemarks", fields: [enquiryId], references: [id])
+  booking         Booking? @relation("BookingRemarks", fields: [bookingId], references: [id])
+
+  @@index([enquiryId])
+  @@index([bookingId])
   @@index([createdBy])
   @@index([createdAt])
   @@map("remarks")

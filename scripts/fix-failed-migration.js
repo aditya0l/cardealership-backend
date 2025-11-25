@@ -51,12 +51,12 @@ async function fixFailedMigration() {
       console.log('   This is normal during initial deployment. Migrations will run later.');
       process.exit(0); // Exit successfully so deployment continues
     } else {
-      console.error('❌ Error cleaning up migration:', error.message);
+    console.error('❌ Error cleaning up migration:', error.message);
       process.exit(0); // Still exit successfully to allow migration deploy to run
     }
   } finally {
     try {
-      await prisma.$disconnect();
+    await prisma.$disconnect();
     } catch (disconnectError) {
       // Ignore disconnect errors
     }

@@ -369,17 +369,19 @@ export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedReques
     teamMemberIds = await getTeamMemberIds(user.firebaseUid, false);
   }
 
+  // Build where clause - handle null dealershipId
   const enquiryWhere: any = {
-    dealershipId: user.dealershipId,
     status: EnquiryStatus.OPEN,
     expectedBookingDate: {
       gte: startOfDay,
       lte: endOfDay
     }
   };
+  if (user.dealershipId) {
+    enquiryWhere.dealershipId = user.dealershipId;
+  }
 
   const bookingWhere: any = {
-    dealershipId: user.dealershipId,
     status: {
       notIn: [BookingStatus.CANCELLED, BookingStatus.DELIVERED]
     },
@@ -388,6 +390,9 @@ export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedReques
       lte: endOfDay
     }
   };
+  if (user.dealershipId) {
+    bookingWhere.dealershipId = user.dealershipId;
+  }
 
   switch (user.role.name as RoleName) {
     case RoleName.CUSTOMER_ADVISOR:
@@ -433,7 +438,9 @@ export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedReques
       ];
   }
 
-  const [enquiries, bookings] = await Promise.all([
+  let enquiries, bookings;
+  try {
+    [enquiries, bookings] = await Promise.all([
     prisma.enquiry.findMany({
       where: enquiryWhere,
       select: {
@@ -464,6 +471,12 @@ export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedReques
       orderBy: { expectedDeliveryDate: 'asc' }
     })
   ]);
+  } catch (error: any) {
+    console.error('Error fetching booking plan:', error);
+    console.error('Enquiry where:', JSON.stringify(enquiryWhere, null, 2));
+    console.error('Booking where:', JSON.stringify(bookingWhere, null, 2));
+    throw createError(`Failed to fetch booking plan: ${error.message}`, 400);
+  }
 
   res.json({
     success: true,
@@ -476,5 +489,246 @@ export const getTodaysBookingPlan = asyncHandler(async (req: AuthenticatedReques
       bookings
     }
   });
+});
+
+/**
+ * Get Team Leader Dashboard Metrics (Module 5)
+ */
+export const getTeamLeaderDashboard = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+
+  // Only Team Leads can access this endpoint
+  if (user.role.name !== RoleName.TEAM_LEAD) {
+    throw createError('Access denied. Team Lead only.', 403);
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(today);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  // Get team members (CAs under this TL)
+  const teamMembers = await prisma.user.findMany({
+    where: {
+      managerId: user.firebaseUid,
+      isActive: true
+    },
+    select: {
+      firebaseUid: true,
+      name: true,
+      email: true,
+      role: {
+        select: { name: true }
+      }
+    }
+  });
+
+  const teamMemberIds = teamMembers.map(m => m.firebaseUid);
+  
+  // Build dealership filter
+  const dealershipFilter: any = {};
+  if (user.dealershipId) {
+    dealershipFilter.dealershipId = user.dealershipId;
+  }
+
+  try {
+    // 1. Team Size
+    const teamSize = teamMembers.length;
+
+    // 2. Total Hot Inquiry Count (sum of all active HOT leads under the team)
+    const totalHotInquiryCount = await prisma.enquiry.count({
+      where: {
+        ...dealershipFilter,
+        status: EnquiryStatus.OPEN,
+        category: 'HOT',
+        OR: [
+          { createdByUserId: { in: teamMemberIds } },
+          { assignedToUserId: { in: teamMemberIds } }
+        ]
+      }
+    });
+
+    // 3. Pending CA on Update (CAs who have missed updates today)
+    const casWithPendingEnquiries = await prisma.enquiry.findMany({
+      where: {
+        ...dealershipFilter,
+        status: EnquiryStatus.OPEN,
+        AND: [
+          {
+            OR: [
+              { nextFollowUpDate: null },
+              { nextFollowUpDate: { lte: endOfDay } }
+            ]
+          },
+          {
+            OR: [
+              { createdByUserId: { in: teamMemberIds } },
+              { assignedToUserId: { in: teamMemberIds } }
+            ]
+          }
+        ]
+      },
+      select: {
+        createdByUserId: true,
+        assignedToUserId: true,
+        id: true
+      }
+    });
+
+    // Check which CAs have updated today
+    const enquiryIds = casWithPendingEnquiries.map(e => e.id);
+    const updatedToday = await prisma.remark.findMany({
+      where: {
+        enquiryId: { in: enquiryIds },
+        createdAt: { gte: today },
+        createdBy: { in: teamMemberIds }
+      },
+      select: { enquiryId: true, createdBy: true }
+    });
+
+    const updatedEnquiryIds = new Set(updatedToday.map(r => r.enquiryId).filter(Boolean));
+    const pendingCAs = new Set<string>();
+    
+    casWithPendingEnquiries.forEach(enquiry => {
+      const caId = enquiry.assignedToUserId || enquiry.createdByUserId;
+      if (caId && teamMemberIds.includes(caId) && !updatedEnquiryIds.has(enquiry.id)) {
+        pendingCAs.add(caId);
+      }
+    });
+
+    const pendingCAOnUpdate = pendingCAs.size;
+
+    // 4. Pending Enquiries To Update (total number of specific enquiries pending action)
+    const pendingEnquiriesToUpdate = await prisma.enquiry.count({
+      where: {
+        ...dealershipFilter,
+        status: EnquiryStatus.OPEN,
+        AND: [
+          {
+            OR: [
+              { createdByUserId: { in: teamMemberIds } },
+              { assignedToUserId: { in: teamMemberIds } }
+            ]
+          },
+          {
+            OR: [
+              { nextFollowUpDate: null },
+              { nextFollowUpDate: { lte: endOfDay } }
+            ]
+          }
+        ],
+        NOT: {
+          remarkHistory: {
+            some: {
+              createdAt: { gte: today },
+              createdBy: { in: teamMemberIds }
+            }
+          }
+        }
+      }
+    });
+
+    // 5. Today's Booking Plan (sum of all EDB == Today across the team)
+    const todaysBookingPlan = await prisma.enquiry.count({
+      where: {
+        ...dealershipFilter,
+        status: EnquiryStatus.OPEN,
+        expectedBookingDate: {
+          gte: today,
+          lte: endOfDay
+        },
+        OR: [
+          { createdByUserId: { in: teamMemberIds } },
+          { assignedToUserId: { in: teamMemberIds } }
+        ]
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Team Leader dashboard retrieved successfully',
+      data: {
+        teamSize,
+        totalHotInquiryCount,
+        pendingCAOnUpdate,
+        pendingEnquiriesToUpdate,
+        todaysBookingPlan
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching Team Leader dashboard:', error);
+    throw createError('Failed to fetch Team Leader dashboard', 500);
+  }
+});
+
+/**
+ * Get Bookings Funnel Math (Task 15)
+ * Actual Live = (Carry Forward + New This Month) - (Delivered + Lost)
+ */
+export const getBookingsFunnel = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const user = req.user;
+  const today = new Date();
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+  // Build dealership filter
+  const dealershipFilter: any = {};
+  if (user.dealershipId) {
+    dealershipFilter.dealershipId = user.dealershipId;
+  }
+
+  try {
+    // Carry Forward (bookings created before this month, not delivered/cancelled)
+    const carryForward = await prisma.booking.count({
+      where: {
+        ...dealershipFilter,
+        createdAt: { lt: startOfMonth },
+        status: { notIn: ['DELIVERED', 'CANCELLED'] }
+      }
+    });
+
+    // New This Month (bookings created this month)
+    const newThisMonth = await prisma.booking.count({
+      where: {
+        ...dealershipFilter,
+        createdAt: { gte: startOfMonth }
+      }
+    });
+
+    // Delivered This Month
+    const delivered = await prisma.booking.count({
+      where: {
+        ...dealershipFilter,
+        status: 'DELIVERED',
+        updatedAt: { gte: startOfMonth }
+      }
+    });
+
+    // Lost (Cancelled) This Month
+    const lost = await prisma.booking.count({
+      where: {
+        ...dealershipFilter,
+        status: 'CANCELLED',
+        updatedAt: { gte: startOfMonth }
+      }
+    });
+
+    // Actual Live = (Carry Forward + New This Month) - (Delivered + Lost)
+    const actualLive = (carryForward + newThisMonth) - (delivered + lost);
+
+    res.json({
+      success: true,
+      message: 'Bookings funnel retrieved successfully',
+      data: {
+        carryForward,
+        newThisMonth,
+        delivered,
+        lost,
+        actualLive
+      }
+    });
+  } catch (error: any) {
+    console.error('Error fetching bookings funnel:', error);
+    throw createError('Failed to fetch bookings funnel', 500);
+  }
 });
 

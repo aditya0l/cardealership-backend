@@ -12,7 +12,8 @@ import {
   updateBookingStatusAndFields,
   getBookingsWithRemarks,
   bulkDownloadBookings,
-  getBookingStatusSummary
+  getBookingStatusSummary,
+  updateVahanDate
 } from '../controllers/bookings.controller';
 import {
   // Admin import endpoints from booking-import controller
@@ -171,6 +172,13 @@ router.put('/:id',
   enforceAdvisorBookingAccess,
   enforceFieldPermissions,
   updateBooking
+);
+
+// Update Vahan Date - All authenticated users (when converting to retail)
+router.put('/:id/vahan-date', 
+  authorize([RoleName.ADMIN, RoleName.GENERAL_MANAGER, RoleName.SALES_MANAGER, RoleName.TEAM_LEAD, RoleName.CUSTOMER_ADVISOR]), 
+  enforceAdvisorBookingAccess,
+  updateVahanDate
 );
 
 // Delete booking - Admin only  

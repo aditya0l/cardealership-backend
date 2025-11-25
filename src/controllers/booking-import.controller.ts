@@ -104,6 +104,17 @@ export const uploadImportFile = [
       throw createError('File size exceeds maximum limit of 10MB', 400);
     }
 
+    // Get admin's dealership ID for multi-tenant isolation
+    const admin = await prisma.user.findUnique({
+      where: { firebaseUid: user.firebaseUid },
+      select: { dealershipId: true }
+    });
+    
+    if (!admin?.dealershipId) {
+      fs.unlinkSync(filePath); // Clean up
+      throw createError('Admin must be assigned to a dealership to import bookings', 400);
+    }
+
     // Create import record
     const importRecord = await prisma.bookingImport.create({
       data: {
@@ -111,30 +122,148 @@ export const uploadImportFile = [
         filename,
         originalFilename: originalname,
         fileSize: BigInt(size),
-        status: ImportStatus.PENDING,
-        importSettings
+        status: ImportStatus.PROCESSING,
+        importSettings,
+        startedAt: new Date()
       }
     });
 
-    // Queue processing job
-    const jobId = await BookingImportProcessor.addImportJob(
-      importRecord.id,
-      filePath,
-      user.firebaseUid,
-      importSettings
-    );
-
-    res.status(201).json({
-      success: true,
-      message: 'File uploaded successfully and queued for processing',
-      data: {
-        importId: importRecord.id,
-        jobId,
-        filename: originalname,
-        fileSize: size,
-        status: importRecord.status
+    try {
+      // Parse file synchronously
+      let parseResult;
+      if (fileType === 'csv') {
+        parseResult = await BookingImportService.parseCSV(filePath);
+      } else if (fileType === 'xlsx') {
+        parseResult = await BookingImportService.parseExcel(filePath);
+      } else {
+        throw new Error(`Unsupported file type: ${fileType}`);
       }
-    });
+
+      // Update import with parsing results
+      await prisma.bookingImport.update({
+        where: { id: importRecord.id },
+        data: {
+          totalRows: parseResult.totalRows,
+          processedRows: parseResult.totalRows
+        }
+      });
+
+      // Log parsing errors
+      if (parseResult.errors.length > 0) {
+        await prisma.bookingImportError.createMany({
+          data: parseResult.errors.map(error => ({
+            importId: importRecord.id,
+            rowNumber: error.rowNumber,
+            rawRow: error.value as any,
+            errorMessage: error.message,
+            errorType: 'validation_error',
+            fieldErrors: { field: error.field, value: error.value } as any
+          }))
+        });
+      }
+
+      // Process valid rows in batches
+      const validRows = parseResult.validRows;
+      let totalSuccessful = 0;
+      let totalFailed = parseResult.errors.length;
+
+      for (let i = 0; i < validRows.length; i += 500) {
+        const batch = validRows.slice(i, i + 500);
+        const batchResult = await BookingImportService.processBatch(
+          batch,
+          importRecord.id,
+          i,
+          admin.dealershipId
+        );
+        
+        totalSuccessful += batchResult.successful;
+        totalFailed += batchResult.failed;
+
+        // Update progress
+        await prisma.bookingImport.update({
+          where: { id: importRecord.id },
+          data: {
+            processedRows: i + batch.length,
+            successfulRows: totalSuccessful,
+            failedRows: totalFailed
+          }
+        });
+      }
+
+      // Generate error summary
+      const errors = await prisma.bookingImportError.findMany({
+        where: { importId: importRecord.id },
+        select: {
+          errorType: true,
+          fieldErrors: true
+        }
+      });
+
+      const errorSummary: any = {
+        total_errors: totalFailed,
+        error_types: {} as any,
+        field_errors: {} as any
+      };
+
+      errors.forEach(error => {
+        const errorType = error.errorType || 'processing_error';
+        errorSummary.error_types[errorType] = (errorSummary.error_types[errorType] || 0) + 1;
+      });
+
+      // Complete import
+      await prisma.bookingImport.update({
+        where: { id: importRecord.id },
+        data: {
+          status: ImportStatus.COMPLETED,
+          completedAt: new Date(),
+          totalRows: parseResult.totalRows,
+          processedRows: validRows.length,
+          successfulRows: totalSuccessful,
+          failedRows: totalFailed,
+          errorSummary: errorSummary as any
+        }
+      });
+
+      // Clean up uploaded file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      res.status(201).json({
+        success: true,
+        message: 'File uploaded and processed successfully',
+        data: {
+          importId: importRecord.id,
+          filename: originalname,
+          fileSize: size,
+          status: ImportStatus.COMPLETED,
+          totalRows: parseResult.totalRows,
+          successfulRows: totalSuccessful,
+          failedRows: totalFailed,
+          errors: []
+        }
+      });
+    } catch (error: any) {
+      // Update import status to failed
+      await prisma.bookingImport.update({
+        where: { id: importRecord.id },
+        data: {
+          status: ImportStatus.FAILED,
+          completedAt: new Date()
+        }
+      });
+
+      // Clean up uploaded file
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+
+      console.error('Import processing error:', error);
+      throw createError(
+        error.message || 'Failed to process import file',
+        500
+      );
+    }
   })
 ];
 

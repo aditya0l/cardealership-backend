@@ -1,0 +1,6 @@
+# Prisma Configuration
+# This file helps prevent schema issues
+
+# Schema validation is handled by scripts/validate-remark-schema.js
+# DO NOT add Enquiry/Booking relations to Remark model - they break Prisma Studio!
+

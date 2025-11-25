@@ -376,19 +376,37 @@ export class BookingImportService {
         // Look up advisor if employee_login or advisor_id provided
         let advisorId = undefined;
         
-        // If advisor_id is directly provided (Firebase UID), use it
-        if (row.advisor_id) {
-          advisorId = row.advisor_id;
+        // If advisor_id is directly provided (Firebase UID), validate it exists
+        if (row.advisor_id && row.advisor_id.trim()) {
+          const advisor = await prisma.user.findUnique({
+            where: { 
+              firebaseUid: row.advisor_id.trim()
+            },
+            select: { 
+              firebaseUid: true,
+              role: {
+                select: { name: true }
+              },
+              isActive: true
+            }
+          });
+          
+          if (advisor && advisor.isActive && advisor.role.name === RoleName.CUSTOMER_ADVISOR) {
+            advisorId = advisor.firebaseUid;
+          }
+          // If advisor doesn't exist or is invalid, we'll continue without advisorId
+          // This allows the import to proceed even if advisor assignment fails
         } 
         // Otherwise, look up by employee_login
-        else if (row.employee_login) {
+        else if (row.employee_login && row.employee_login.trim()) {
           const advisor = await prisma.user.findFirst({
             where: { 
               OR: [
-                { email: { contains: row.employee_login, mode: 'insensitive' } },
-                { name: { contains: row.emp_name || '', mode: 'insensitive' } }
+                { email: { contains: row.employee_login.trim(), mode: 'insensitive' } },
+                { name: { contains: (row.emp_name || '').trim(), mode: 'insensitive' } }
               ],
-              role: { name: RoleName.CUSTOMER_ADVISOR }
+              role: { name: RoleName.CUSTOMER_ADVISOR },
+              isActive: true
             }
           });
           
@@ -402,31 +420,38 @@ export class BookingImportService {
         const stockAvailability = row.stock_availability
           ? (row.stock_availability as string).toUpperCase()
           : undefined;
-        const chassisNumber = row.chassis_number ? row.chassis_number : null;
-        const allocationOrderNumber = row.allocation_order_number ? row.allocation_order_number : null;
+        const chassisNumber = row.chassis_number && row.chassis_number.trim() ? row.chassis_number.trim() : null;
+        const allocationOrderNumber = row.allocation_order_number && row.allocation_order_number.trim() ? row.allocation_order_number.trim() : null;
+
+        // Helper to convert empty strings to undefined (Prisma doesn't accept empty strings for optional fields)
+        const cleanString = (value: any): string | undefined => {
+          if (value === null || value === undefined) return undefined;
+          const str = String(value).trim();
+          return str === '' ? undefined : str;
+        };
 
         // Create booking with universal format
         await prisma.booking.create({
           data: {
             // Universal Dealer Fields
-            zone: row.zone,
-            region: row.region,
-            dealerCode: row.dealer_code,
+            zone: cleanString(row.zone),
+            region: cleanString(row.region),
+            dealerCode: row.dealer_code.trim(), // Required field, must have value
             dealerId: dealer.id,
             dealershipId: adminDealershipId, // CRITICAL: Set dealership for multi-tenant isolation
             
             // Customer Information
-            optyId: row.opty_id,
-            customerName: row.customer_name,
-            customerPhone: row.customer_phone,
-            customerEmail: row.customer_email,
+            optyId: cleanString(row.opty_id),
+            customerName: row.customer_name.trim(), // Required field
+            customerPhone: cleanString(row.customer_phone),
+            customerEmail: cleanString(row.customer_email),
             
             // Vehicle Information
-            variant: row.variant,
-            vcCode: row.vc_code,
-            color: row.color,
-            fuelType: row.fuel_type,
-            transmission: row.transmission,
+            variant: cleanString(row.variant),
+            vcCode: cleanString(row.vc_code),
+            color: cleanString(row.color),
+            fuelType: cleanString(row.fuel_type),
+            transmission: cleanString(row.transmission),
             
             // Booking Details
             bookingDate: row.booking_date ? new Date(row.booking_date) : null,
@@ -434,14 +459,14 @@ export class BookingImportService {
             expectedDeliveryDate: row.expected_delivery_date ? new Date(row.expected_delivery_date) : null,
             
             // Employee/Division
-            division: row.division,
-            empName: row.emp_name,
-            employeeLogin: row.employee_login,
+            division: cleanString(row.division),
+            empName: cleanString(row.emp_name),
+            employeeLogin: cleanString(row.employee_login),
             advisorId,
             
             // Finance Information
             financeRequired,
-            financerName: row.financer_name,
+            financerName: cleanString(row.financer_name),
             fileLoginDate: row.file_login_date ? new Date(row.file_login_date) : null,
             approvalDate: row.approval_date ? new Date(row.approval_date) : null,
             
@@ -453,7 +478,7 @@ export class BookingImportService {
             
             // System Fields
             source: BookingSource.BULK_IMPORT,
-            remarks: row.remarks,
+            remarks: cleanString(row.remarks),
             metadata: {
               imported_from: 'universal_dealer_format',
               original_row: row as any

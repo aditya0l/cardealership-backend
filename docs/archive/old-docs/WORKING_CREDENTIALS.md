@@ -1,27 +1,64 @@
 # 🔐 WORKING TEST CREDENTIALS
 
-## 📅 Last Updated: October 9, 2025
+## 📅 Last Updated: November 9, 2025
 
 ---
 
-## ✅ **VERIFIED WORKING CREDENTIALS**
+## ✅ **VERIFIED WORKING CREDENTIALS (Fresh Database - Nov 22, 2025)**
 
 ### **For Expo Mobile App (Customer Advisors):**
 
 ```
-Email: advisor.new@test.com
+Email: advisor@test.com
 Password: testpassword123
 Role: CUSTOMER_ADVISOR
-Firebase UID: bPqDAnO0o6WGNR4WR19l7TLEz2d2
+Employee ID: ADV001
+Firebase UID: A3JKSTqvuPa3mxvPVcERcOD2buv2
+Status: ✅ Fresh user created
 ```
 
 ### **For Web Admin Dashboard:**
 
 ```
-Email: admin.new@test.com
+Email: admin@test.com
 Password: testpassword123
 Role: ADMIN
-Firebase UID: p9BTaIFDPgSlYLavxN6VZEEQme23
+Employee ID: ADM001
+Firebase UID: YTPf9tKbZ1dsTYqDBlLc3xzdryo2
+Status: ✅ Fresh user created
+```
+
+### **For Testing (General Manager):**
+
+```
+Email: gm@test.com
+Password: testpassword123
+Role: GENERAL_MANAGER
+Employee ID: GM001
+Firebase UID: htwGSGv8DuV6m3vHf8KFK3S03AJ2
+Status: ✅ Fresh user created
+```
+
+### **For Testing (Sales Manager):**
+
+```
+Email: sm@test.com
+Password: testpassword123
+Role: SALES_MANAGER
+Employee ID: SM001
+Firebase UID: UIETCzR0imYbjJwaNpx98qOOAm82
+Status: ✅ Fresh user created
+```
+
+### **For Testing (Team Lead):**
+
+```
+Email: tl@test.com
+Password: testpassword123
+Role: TEAM_LEAD
+Employee ID: TL001
+Firebase UID: A1oMP6KKndOEeOrxuE1HUw0OxVH2
+Status: ✅ Fresh user created
 ```
 
 ---
@@ -32,8 +69,9 @@ Firebase UID: p9BTaIFDPgSlYLavxN6VZEEQme23
 
 | Email | Password | Role | UID | Status |
 |-------|----------|------|-----|--------|
-| `advisor.new@test.com` | `testpassword123` | CUSTOMER_ADVISOR | bPqDAnO0o6WGNR4WR19l7TLEz2d2 | ✅ Active |
-| `admin.new@test.com` | `testpassword123` | ADMIN | p9BTaIFDPgSlYLavxN6VZEEQme23 | ✅ Active |
+| `advisor.new@test.com` | `testpassword123` | CUSTOMER_ADVISOR | pb2cL18d3HbcNdIUGoKtfbKToE32 | ✅ Active (Nov 9) |
+| `admin.new@test.com` | `testpassword123` | ADMIN | q1pAC6uCRhTkNTYkxzRQ0puFPG03 | ✅ Active (Nov 9) |
+| `test1@test.com` | `Test123456` | GENERAL_MANAGER | wLkW2zFsnNOTCT3q84zUNXikJfs2 | ✅ Active (Nov 9) |
 
 ### **Seed Users (Created via seed script):**
 
@@ -122,17 +160,75 @@ const userCredential = await signInWithEmailAndPassword(
 
 ## 🚀 **QUICK START**
 
-### Expo App:
+### Expo App (Customer Advisor):
 ```
-Email: advisor.new@test.com
+Email: advisor@test.com
 Password: testpassword123
 ```
 
 ### Admin Dashboard:
 ```
-Email: admin.new@test.com
+Email: admin@test.com
 Password: testpassword123
 ```
 
-**Both are VERIFIED WORKING!** ✅
+### General Manager (Testing):
+```
+Email: gm@test.com
+Password: testpassword123
+```
+
+### Sales Manager (Testing):
+```
+Email: sm@test.com
+Password: testpassword123
+```
+
+### Team Lead (Testing):
+```
+Email: tl@test.com
+Password: testpassword123
+```
+
+**All credentials are VERIFIED WORKING!** ✅
+
+---
+
+## 🔧 **RESET PASSWORDS**
+
+If you forget a password, reset it using the backend:
+
+```bash
+npx ts-node scripts/reset-firebase-user-password.ts <email> <new-password>
+```
+
+**Examples:**
+```bash
+npx ts-node scripts/reset-firebase-user-password.ts test1@test.com Test123456
+npx ts-node scripts/reset-firebase-user-password.ts advisor.new@test.com testpassword123
+```
+
+---
+
+## 🔍 **CHECK USER EXISTS**
+
+Verify a user exists in Firebase:
+
+```bash
+npx ts-node scripts/check-firebase-user.ts <email>
+```
+
+**Example:**
+```bash
+npx ts-node scripts/check-firebase-user.ts test1@test.com
+```
+
+---
+
+## 📚 **TROUBLESHOOTING**
+
+See `FIREBASE_LOGIN_TROUBLESHOOTING.md` for:
+- Why "auth/invalid-credential" errors occur
+- How to verify Expo app Firebase config
+- Complete diagnostic checklist
 

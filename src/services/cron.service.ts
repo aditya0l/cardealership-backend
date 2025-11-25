@@ -65,9 +65,26 @@ class CronService {
       }
     });
     
+    // Daily escalation matrix alerts at 8 AM (Module 6)
+    cron.schedule('0 8 * * *', async () => {
+      console.log('🔄 Starting escalation matrix alerts at 8 AM...');
+      try {
+        // Inactivity alerts (5-day neglect)
+        await FollowUpNotificationService.processInactivityAlerts();
+        // Aging alerts (20-25, 30-35, 40+ days)
+        await FollowUpNotificationService.processAgingAlerts();
+        // Retail delay alerts (15-day post-booking)
+        await FollowUpNotificationService.processRetailDelayAlerts();
+        console.log('✅ Escalation matrix alerts completed at 8 AM');
+      } catch (error) {
+        console.error('❌ Error in escalation matrix alerts:', error);
+      }
+    });
+    
       this.isInitialized = true;
       console.log('✅ Cron jobs initialized successfully');
       console.log('📅 Scheduled jobs:');
+      console.log('  - Escalation matrix alerts: 8:00 AM IST (inactivity, aging, retail delay)');
       console.log('  - Daily follow-ups: 9:00 AM IST');
       console.log('  - Hourly urgent checks: Every hour');
       console.log('  - Evening reminders: 6:00 PM IST');
@@ -128,6 +145,12 @@ class CronService {
           schedule: '0 10 * * 1',
           timezone: 'Asia/Kolkata',
           description: 'Send weekly summary on Monday at 10 AM'
+        },
+        {
+          name: 'Escalation Matrix Alerts',
+          schedule: '0 8 * * *',
+          timezone: 'Asia/Kolkata',
+          description: 'Process inactivity, aging, and retail delay alerts daily at 8 AM'
         }
       ]
     };

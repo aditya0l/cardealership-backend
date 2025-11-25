@@ -1,10 +1,15 @@
 import { Router } from 'express';
 import { 
-  addRemark, 
-  getRemarksHistory, 
-  updateStatusWithRemark, 
-  getTeamEntitiesWithRemarks,
-  getRemarkStats,
+  addEnquiryRemark,
+  addBookingRemark,
+  getEnquiryRemarksHistory,
+  getBookingRemarksHistory,
+  updateEnquiryStatusWithRemark,
+  updateBookingStatusWithRemark,
+  getTeamEnquiriesWithRemarks,
+  getTeamBookingsWithRemarks,
+  getEnquiryRemarkStats,
+  getBookingRemarkStats,
   cancelRemark,
   getPendingUpdatesSummary
 } from '../controllers/remark.controller';
@@ -21,19 +26,18 @@ router.post('/remarks/:remarkId/cancel', cancelRemark);
 // Pending updates summary for current user
 router.get('/pending/summary', getPendingUpdatesSummary);
 
-// Get remarks history for enquiry or booking
-router.get('/:entityType/:entityId/remarks/history', getRemarksHistory);
+// Enquiry remark routes
+router.post('/enquiry/:enquiryId/remarks', addEnquiryRemark);
+router.get('/enquiry/:enquiryId/remarks/history', getEnquiryRemarksHistory);
+router.patch('/enquiry/:enquiryId/status', updateEnquiryStatusWithRemark);
+router.get('/enquiry/:enquiryId/remarks/stats', getEnquiryRemarkStats);
+router.get('/enquiry/team', getTeamEnquiriesWithRemarks);
 
-// Add remark to enquiry or booking
-router.post('/:entityType/:entityId/remarks', addRemark);
-
-// Update status with remark
-router.patch('/:entityType/:entityId/status', updateStatusWithRemark);
-
-// Get team entities with remarks (for TL and above)
-router.get('/:entityType/team', getTeamEntitiesWithRemarks);
-
-// Get remark statistics
-router.get('/:entityType/:entityId/remarks/stats', getRemarkStats);
+// Booking remark routes
+router.post('/booking/:bookingId/remarks', addBookingRemark);
+router.get('/booking/:bookingId/remarks/history', getBookingRemarksHistory);
+router.patch('/booking/:bookingId/status', updateBookingStatusWithRemark);
+router.get('/booking/:bookingId/remarks/stats', getBookingRemarkStats);
+router.get('/booking/team', getTeamBookingsWithRemarks);
 
 export default router;

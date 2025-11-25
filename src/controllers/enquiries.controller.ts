@@ -253,37 +253,44 @@ export const getEnquiries = asyncHandler(async (req: AuthenticatedRequest, res: 
     where.createdByUserId = user.firebaseUid;
   }
 
-  const [enquiries, total] = await Promise.all([
-    prisma.enquiry.findMany({
-      where,
-      skip,
-      take: limit,
-      include: {
-        assignedTo: {
-          select: {
-            firebaseUid: true,
-            name: true,
-            email: true
+  let enquiries, total;
+  try {
+    [enquiries, total] = await Promise.all([
+      prisma.enquiry.findMany({
+        where,
+        skip,
+        take: limit,
+        include: {
+          assignedTo: {
+            select: {
+              firebaseUid: true,
+              name: true,
+              email: true
+            }
+          },
+          createdBy: {
+            select: {
+              firebaseUid: true,
+              name: true,
+              email: true
+            }
+          },
+          _count: {
+            select: {
+              bookings: true,
+              quotations: true
+            }
           }
         },
-        createdBy: {
-          select: {
-            firebaseUid: true,
-            name: true,
-            email: true
-          }
-        },
-        _count: {
-          select: {
-            bookings: true,
-            quotations: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    }),
-    prisma.enquiry.count({ where })
-  ]);
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.enquiry.count({ where })
+    ]);
+  } catch (error: any) {
+    console.error('Error fetching enquiries:', error);
+    console.error('Where clause:', JSON.stringify(where, null, 2));
+    throw createError(`Failed to fetch enquiries: ${error.message}`, 400);
+  }
 
   // Return enquiries with direct fields (no parsing needed)
   const formattedEnquiries = enquiries;
@@ -325,26 +332,7 @@ export const getEnquiryById = asyncHandler(async (req: AuthenticatedRequest, res
         }
       },
       bookings: true,
-      quotations: true,
-      remarkHistory: {
-        where: {
-          isCancelled: false
-        } as any,
-        orderBy: { createdAt: 'desc' },
-        take: 3,
-        include: {
-          user: {
-            select: {
-              firebaseUid: true,
-              name: true,
-              email: true,
-              role: {
-                select: { name: true }
-              }
-            }
-          }
-        }
-      }
+      quotations: true
     }
   });
 
@@ -357,8 +345,85 @@ export const getEnquiryById = asyncHandler(async (req: AuthenticatedRequest, res
     throw createError('You can only access enquiries you created', 403);
   }
 
-  // Use enquiry directly as it has all fields already
-  const formattedEnquiry = enquiry;
+  // Fetch remarks using enquiryId
+  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  const remarks = await prisma.remark.findMany({
+    where: {
+      enquiryId: id,
+      isCancelled: false,
+      createdAt: {
+        gte: threeDaysAgo
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    include: {
+      user: {
+        select: {
+          firebaseUid: true,
+          name: true,
+          email: true,
+          role: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // Define role hierarchy for sorting (higher number = higher authority)
+  const roleHierarchy: Record<string, number> = {
+    'ADMIN': 5,
+    'GENERAL_MANAGER': 4,
+    'SALES_MANAGER': 3,
+    'TEAM_LEAD': 2,
+    'CUSTOMER_ADVISOR': 1
+  };
+
+  // Format remarkHistory with hierarchy sorting and proper date formatting
+  const formattedRemarkHistory = remarks
+    .map((remark) => {
+      const roleName = remark.user.role?.name || 'CUSTOMER_ADVISOR';
+      const hierarchyLevel = roleHierarchy[roleName] || 0;
+      
+      return {
+        id: remark.id,
+        remark: remark.remark,
+        remarkType: remark.remarkType || 'enquiry_remark',
+        createdAt: remark.createdAt.toISOString(),
+        createdDate: remark.createdAt.toISOString().split('T')[0], // YYYY-MM-DD format
+        createdTime: remark.createdAt.toISOString().split('T')[1].split('.')[0], // HH:MM:SS format
+        timestamp: remark.createdAt.getTime(), // Unix timestamp for sorting
+        hierarchyLevel, // For sorting by hierarchy
+        createdBy: {
+          id: remark.user.firebaseUid,
+          name: remark.user.name,
+          role: {
+            id: remark.user.role?.id || null,
+            name: roleName
+          }
+        },
+        cancelled: remark.isCancelled,
+        cancellationReason: remark.cancellationReason || null
+      };
+    })
+    // Sort by hierarchy (higher roles first), then by timestamp (newest first)
+    .sort((a, b) => {
+      // First sort by hierarchy level (descending - higher roles first)
+      if (b.hierarchyLevel !== a.hierarchyLevel) {
+        return b.hierarchyLevel - a.hierarchyLevel;
+      }
+      // Then sort by timestamp (descending - newest first)
+      return b.timestamp - a.timestamp;
+    });
+
+  // Use enquiry with formatted remarkHistory
+  const formattedEnquiry = {
+    ...enquiry,
+    remarkHistory: formattedRemarkHistory
+  };
 
   res.json({
     success: true,
@@ -394,6 +459,11 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
 
   if (!existingEnquiry) {
     throw createError('Enquiry not found', 404);
+  }
+
+  // 🔒 LOCK ENTRY: Prevent updates to closed enquiries (Task 10)
+  if (existingEnquiry.status === EnquiryStatus.CLOSED) {
+    throw createError('Cannot update closed enquiry. Entry is locked.', 403);
   }
 
   const dealershipContext = await resolveDealershipContext(
@@ -485,6 +555,29 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
       throw createError('Invalid category. Must be HOT, LOST, or BOOKED', 400);
     }
     updateFields.category = category;
+
+    // 🔒 MANDATORY REASON FOR LOST (Task 10)
+    if (category === EnquiryCategory.LOST && existingEnquiry.category !== EnquiryCategory.LOST) {
+      // Check if lostReason is provided (can be in caRemarks or separate field)
+      const lostReason = req.body.lostReason || req.body.caRemarks;
+      if (!lostReason || !lostReason.trim()) {
+        throw createError('Reason for lost is required. Please provide a reason when marking enquiry as lost.', 400);
+      }
+
+      // Store reason as remark
+      await prisma.remark.create({
+        data: {
+          enquiryId: id,
+          remark: `Status changed to LOST. Reason: ${lostReason.trim()}`,
+          remarkType: 'ca_remarks',
+          createdBy: req.user.firebaseUid
+        }
+      });
+
+      // Close the enquiry
+      updateFields.status = EnquiryStatus.CLOSED;
+      updateFields.caRemarks = lostReason.trim();
+    }
   }
 
   const enquiry = await prisma.enquiry.update({
@@ -901,10 +994,12 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
         },
         remarkHistory: {
           where: {
-            isCancelled: false
+            isCancelled: false,
+            createdAt: {
+              gte: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // Last 3 days
+            }
           } as any,
           orderBy: { createdAt: 'desc' },
-          take: 3,
           include: {
             user: {
               select: {
@@ -912,7 +1007,10 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
                 name: true,
                 email: true,
                 role: {
-                  select: { name: true }
+                  select: { 
+                    id: true,
+                    name: true 
+                  }
                 }
               }
             }
@@ -932,11 +1030,65 @@ export const getEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedReq
     prisma.enquiry.count({ where })
   ]);
 
+  // Define role hierarchy for sorting (higher number = higher authority)
+  const roleHierarchy: Record<string, number> = {
+    'ADMIN': 5,
+    'GENERAL_MANAGER': 4,
+    'SALES_MANAGER': 3,
+    'TEAM_LEAD': 2,
+    'CUSTOMER_ADVISOR': 1
+  };
+
+  // Format remarks with hierarchy sorting and proper date/time formatting
+  const formattedEnquiries = enquiries.map((enquiry) => {
+    const formattedRemarks = enquiry.remarkHistory
+      .map((remark) => {
+        const roleName = remark.user.role?.name || 'CUSTOMER_ADVISOR';
+        const hierarchyLevel = roleHierarchy[roleName] || 0;
+        
+        return {
+          id: remark.id,
+          remark: remark.remark,
+          remarkType: remark.remarkType || 'enquiry_remark',
+          createdAt: remark.createdAt.toISOString(),
+          createdDate: remark.createdAt.toISOString().split('T')[0], // YYYY-MM-DD format
+          createdTime: remark.createdAt.toISOString().split('T')[1].split('.')[0], // HH:MM:SS format
+          timestamp: remark.createdAt.getTime(), // Unix timestamp for sorting
+          hierarchyLevel, // For sorting by hierarchy
+          createdBy: {
+            id: remark.user.firebaseUid,
+            name: remark.user.name,
+            email: remark.user.email,
+            role: {
+              id: remark.user.role?.id || null,
+              name: roleName
+            }
+          },
+          cancelled: remark.isCancelled,
+          cancellationReason: remark.cancellationReason || null
+        };
+      })
+      // Sort by hierarchy (higher roles first), then by timestamp (newest first)
+      .sort((a, b) => {
+        // First sort by hierarchy level (descending - higher roles first)
+        if (b.hierarchyLevel !== a.hierarchyLevel) {
+          return b.hierarchyLevel - a.hierarchyLevel;
+        }
+        // Then sort by timestamp (descending - newest first)
+        return b.timestamp - a.timestamp;
+      });
+
+    return {
+      ...enquiry,
+      remarkHistory: formattedRemarks
+    };
+  });
+
   res.json({
     success: true,
     message: 'Enquiries with remarks retrieved successfully',
     data: {
-      enquiries,
+      enquiries: formattedEnquiries,
       pagination: {
         page: Number(page),
         limit: Number(limit),
@@ -1103,20 +1255,24 @@ export const bulkDownloadEnquiries = asyncHandler(async (req: AuthenticatedReque
 export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   
+  // Build where clause - handle null dealershipId
+  const whereClause: any = {};
+  if (user.dealershipId) {
+    whereClause.dealershipId = user.dealershipId;
+  }
+  
   // Get status summary
   const statusSummary = await prisma.enquiry.groupBy({
     by: ['status'],
-    where: { dealershipId: user.dealershipId },
-    _count: true,
-    orderBy: { _count: { status: 'desc' } }
+    where: whereClause,
+    _count: true
   });
   
   // Get category summary
   const categorySummary = await prisma.enquiry.groupBy({
     by: ['category'],
-    where: { dealershipId: user.dealershipId },
-    _count: true,
-    orderBy: { _count: { category: 'desc' } }
+    where: whereClause,
+    _count: true
   });
   
   // Get recent enquiries count (last 7 days)
@@ -1125,7 +1281,7 @@ export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedReq
   
   const recentEnquiries = await prisma.enquiry.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       createdAt: { gte: sevenDaysAgo }
     }
   });
@@ -1133,7 +1289,7 @@ export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedReq
   // Get hot enquiries needing follow-up
   const hotEnquiries = await prisma.enquiry.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       category: 'HOT',
       status: 'OPEN'
     }
@@ -1143,7 +1299,7 @@ export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedReq
   const today = new Date();
   const overdueFollowUps = await prisma.enquiry.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       nextFollowUpDate: { lt: today },
       status: 'OPEN'
     }
@@ -1152,20 +1308,18 @@ export const getEnquiryStatusSummary = asyncHandler(async (req: AuthenticatedReq
   // Get source summary
   const sourceSummary = await prisma.enquiry.groupBy({
     by: ['source'],
-    where: { dealershipId: user.dealershipId },
-    _count: true,
-    orderBy: { _count: { source: 'desc' } }
+    where: whereClause,
+    _count: true
   });
   
   // Get advisor-wise summary
   const advisorSummary = await prisma.enquiry.groupBy({
     by: ['assignedToUserId'],
     where: { 
-      dealershipId: user.dealershipId,
+      ...whereClause,
       assignedToUserId: { not: null }
     },
-    _count: true,
-    orderBy: { _count: { assignedToUserId: 'desc' } }
+    _count: true
   });
   
   // Get advisor names

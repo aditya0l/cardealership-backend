@@ -9,7 +9,7 @@ import {
   canPerformAction,
   hasFieldPermission
 } from '../middlewares/rbac.middleware';
-import { BookingStatus, RoleName, BookingSource } from '@prisma/client';
+import { BookingStatus, RoleName, BookingSource, Prisma } from '@prisma/client';
 
 interface CreateBookingRequest {
   // Customer Information
@@ -181,35 +181,39 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
   }
 
   try {
-    const [bookings, total] = await Promise.all([
-      prisma.booking.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          enquiry: {
-            select: {
-              id: true,
-              customerName: true,
-              customerContact: true,
-              customerEmail: true,
-              status: true
-            }
-          },
-          advisor: {
-            select: {
-              firebaseUid: true,
-              name: true,
-              email: true,
-              role: true
-            }
+    const bookings = await prisma.booking.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        enquiry: {
+          select: {
+            id: true,
+            customerName: true,
+            customerContact: true,
+            customerEmail: true,
+            status: true
           }
-          // Removed: dealer: false (was causing issues)
         },
-        orderBy: { createdAt: 'desc' }
-      }),
-      prisma.booking.count({ where })
-    ]);
+        advisor: {
+          select: {
+            firebaseUid: true,
+            name: true,
+            email: true,
+            role: true
+          }
+        }
+        // Removed: dealer: false (was causing issues)
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // Get total - use findMany with select to avoid count query issues
+    const allBookingIds = await prisma.booking.findMany({
+      where,
+      select: { id: true }
+    });
+    const total = allBookingIds.length;
 
     // Filter each booking based on user's read permissions
     let filteredBookings;
@@ -1253,12 +1257,17 @@ export const bulkDownloadBookings = asyncHandler(async (req: AuthenticatedReques
 export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const user = req.user;
   
+  // Build where clause - handle null dealershipId
+  const whereClause: any = {};
+  if (user.dealershipId) {
+    whereClause.dealershipId = user.dealershipId;
+  }
+  
   // Get status summary
   const statusSummary = await prisma.booking.groupBy({
     by: ['status'],
-    where: { dealershipId: user.dealershipId },
-    _count: true,
-    orderBy: { _count: { status: 'desc' } }
+    where: whereClause,
+    _count: true
   });
   
   // Get recent bookings count (last 7 days)
@@ -1267,7 +1276,7 @@ export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedReq
   
   const recentBookings = await prisma.booking.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       createdAt: { gte: sevenDaysAgo }
     }
   });
@@ -1275,7 +1284,7 @@ export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedReq
   // Get pending bookings (need attention)
   const pendingBookings = await prisma.booking.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       status: { in: ['PENDING', 'ASSIGNED'] }
     }
   });
@@ -1284,7 +1293,7 @@ export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedReq
   const today = new Date();
   const overdueDeliveries = await prisma.booking.count({
     where: {
-      dealershipId: user.dealershipId,
+      ...whereClause,
       expectedDeliveryDate: { lt: today },
       status: { notIn: ['DELIVERED', 'CANCELLED'] }
     }
@@ -1293,9 +1302,8 @@ export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedReq
   // Get advisor-wise summary
   const advisorSummary = await prisma.booking.groupBy({
     by: ['advisorId'],
-    where: { dealershipId: user.dealershipId },
-    _count: true,
-    orderBy: { _count: { advisorId: 'desc' } }
+    where: whereClause,
+    _count: true
   });
   
   // Get advisor names
@@ -1329,5 +1337,76 @@ export const getBookingStatusSummary = asyncHandler(async (req: AuthenticatedReq
       totalBookings: statusSummary.reduce((sum, item) => sum + item._count, 0),
       summaryDate: new Date().toISOString()
     }
+  });
+});
+
+/**
+ * Update Vahan Date (Missing Feature)
+ * Capture Vahan Date when converting to Retail
+ */
+export const updateVahanDate = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { vahanDate } = req.body;
+  const user = req.user;
+
+  if (!vahanDate) {
+    throw createError('Vahan date is required', 400);
+  }
+
+  const parsedDate = new Date(vahanDate);
+  if (isNaN(parsedDate.getTime())) {
+    throw createError('Invalid vahan date format. Use ISO-8601 format (YYYY-MM-DD or YYYY-MM-DDTHH:mm:ss.sssZ)', 400);
+  }
+
+  // Check if booking exists and user has access
+  const existingBooking = await prisma.booking.findFirst({
+    where: {
+      id,
+      dealershipId: user.dealershipId
+    }
+  });
+
+  if (!existingBooking) {
+    throw createError('Booking not found or access denied', 404);
+  }
+
+  // Update vahan date
+  const updatedBooking = await prisma.booking.update({
+    where: { id },
+    data: {
+      vahanDate: parsedDate
+    } as Prisma.BookingUpdateInput,
+    include: {
+      advisor: {
+        select: {
+          firebaseUid: true,
+          name: true,
+          email: true
+        }
+      }
+    }
+  });
+
+  // Create audit log
+  await prisma.bookingAuditLog.create({
+    data: {
+      bookingId: id,
+      changedBy: user.firebaseUid,
+      action: 'UPDATE',
+      oldValue: existingBooking as any,
+      newValue: updatedBooking as any,
+      changeReason: 'Vahan date updated',
+      ipAddress: req.ip,
+      userAgent: req.get('User-Agent')
+    }
+  });
+
+  // Filter response based on user's read permissions
+  const filteredBooking = filterReadableFields(updatedBooking, user.role.name);
+
+  res.json({
+    success: true,
+    message: 'Vahan date updated successfully',
+    data: { booking: filteredBooking }
   });
 });

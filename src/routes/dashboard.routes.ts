@@ -4,9 +4,12 @@ import {
   getSalesPerformance,
   getRecentActivities,
   getDashboardStats,
-  getTodaysBookingPlan
+  getTodaysBookingPlan,
+  getTeamLeaderDashboard,
+  getBookingsFunnel
 } from '../controllers/dashboard.controller';
-import { authenticate } from '../middlewares/auth.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { RoleName } from '@prisma/client';
 
 const router = Router();
 
@@ -19,6 +22,8 @@ router.get('/revenue-chart', getRevenueChartData);
 router.get('/sales-performance', getSalesPerformance);
 router.get('/recent-activities', getRecentActivities);
 router.get('/booking-plan/today', getTodaysBookingPlan);
+router.get('/team-leader', authorize([RoleName.TEAM_LEAD]), getTeamLeaderDashboard);
+router.get('/bookings/funnel', getBookingsFunnel);
 
 export default router;
 

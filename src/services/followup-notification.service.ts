@@ -464,6 +464,397 @@ class FollowUpNotificationService {
     
     console.log(`✅ Sent weekly summary to ${activeUsers.length} management users`);
   }
+
+  /**
+   * Process Inactivity Alerts (Module 6 - 5-Day Neglect)
+   * If a Hot Inquiry has 0 updates for 5 days → Notify TL
+   */
+  async processInactivityAlerts(): Promise<void> {
+    console.log('🔄 Processing inactivity alerts (5-day neglect)...');
+    
+    const today = new Date();
+    const fiveDaysAgo = new Date(today);
+    fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+    
+    // Find enquiries with no updates in 5 days
+    const inactiveEnquiries = await prisma.enquiry.findMany({
+      where: {
+        status: 'OPEN',
+        category: 'HOT',
+        OR: [
+          { lastFollowUpDate: { lt: fiveDaysAgo } },
+          { lastFollowUpDate: null, createdAt: { lt: fiveDaysAgo } }
+        ],
+        // Ensure no remarks in last 5 days
+        remarkHistory: {
+          none: {
+            createdAt: { gte: fiveDaysAgo },
+            isCancelled: false
+          }
+        }
+      },
+      include: {
+        createdBy: {
+          include: {
+            manager: {
+              select: {
+                firebaseUid: true,
+                name: true,
+                email: true,
+                fcmToken: true
+              }
+            }
+          }
+        },
+        dealership: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+    
+    let notificationCount = 0;
+    for (const enquiry of inactiveEnquiries) {
+      // Notify TL (Team Lead)
+      if (enquiry.createdBy.manager) {
+        await FCMService.sendNotification(enquiry.createdBy.manager.fcmToken || '', {
+          title: '🚨 Inactive Enquiry Alert',
+          body: `Enquiry for ${enquiry.customerName} has no updates for 5 days`,
+          data: {
+            type: 'inactivity_alert',
+            entityId: enquiry.id,
+            priority: 'HIGH'
+          }
+        });
+        
+        await this.logNotification(
+          enquiry.createdBy.manager.firebaseUid,
+          'Inactive Enquiry Alert',
+          `Enquiry for ${enquiry.customerName} has no updates for 5 days`,
+          'inactivity_alert',
+          enquiry.id
+        );
+        
+        notificationCount++;
+      }
+    }
+    
+    console.log(`✅ Processed ${inactiveEnquiries.length} inactive enquiries, sent ${notificationCount} notifications`);
+  }
+
+  /**
+   * Process Aging Alerts (Module 6 - Lead Duration)
+   * 20-25 Days Open: Notify CA + TL
+   * 30-35 Days Open: Notify Sales Manager (SM)
+   * 40+ Days Open: Notify General Manager (GM)
+   */
+  async processAgingAlerts(): Promise<void> {
+    console.log('🔄 Processing aging alerts...');
+    
+    const today = new Date();
+    
+    // 20-25 days open
+    const twentyDaysAgo = new Date(today);
+    twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 25);
+    const twentyFiveDaysAgo = new Date(today);
+    twentyFiveDaysAgo.setDate(twentyFiveDaysAgo.getDate() - 20);
+    
+    const ageing20to25 = await prisma.enquiry.findMany({
+      where: {
+        status: 'OPEN',
+        createdAt: {
+          gte: twentyDaysAgo,
+          lte: twentyFiveDaysAgo
+        }
+      },
+      include: {
+        createdBy: {
+          include: { 
+            manager: {
+              select: {
+                firebaseUid: true,
+                fcmToken: true,
+                name: true
+              }
+            }
+          },
+          select: {
+            firebaseUid: true,
+            fcmToken: true,
+            name: true,
+            managerId: true
+          }
+        },
+        assignedTo: {
+          select: {
+            firebaseUid: true,
+            fcmToken: true,
+            name: true
+          }
+        },
+        dealership: {
+          select: { id: true }
+        }
+      }
+    });
+    
+    // Notify CA and TL for 20-25 days
+    for (const enquiry of ageing20to25) {
+      // Notify CA
+      const ca = enquiry.assignedTo || enquiry.createdBy;
+      if (ca?.fcmToken) {
+        await FCMService.sendNotification(ca.fcmToken, {
+          title: '⚠️ Aging Enquiry Alert (20-25 Days)',
+          body: `Enquiry for ${enquiry.customerName} is 20-25 days old`,
+          data: {
+            type: 'aging_alert',
+            entityId: enquiry.id,
+            priority: 'MEDIUM'
+          }
+        });
+        
+        await this.logNotification(
+          ca.firebaseUid,
+          'Aging Enquiry Alert (20-25 Days)',
+          `Enquiry for ${enquiry.customerName} is 20-25 days old`,
+          'aging_alert',
+          enquiry.id
+        );
+      }
+      
+      // Notify TL
+      if (enquiry.createdBy.manager?.fcmToken) {
+        await FCMService.sendNotification(enquiry.createdBy.manager.fcmToken, {
+          title: '⚠️ Aging Enquiry Alert (20-25 Days)',
+          body: `Enquiry for ${enquiry.customerName} is 20-25 days old`,
+          data: {
+            type: 'aging_alert',
+            entityId: enquiry.id,
+            priority: 'MEDIUM'
+          }
+        });
+        
+        await this.logNotification(
+          enquiry.createdBy.manager.firebaseUid,
+          'Aging Enquiry Alert (20-25 Days)',
+          `Enquiry for ${enquiry.customerName} is 20-25 days old`,
+          'aging_alert',
+          enquiry.id
+        );
+      }
+    }
+    
+    // 30-35 days open - Notify Sales Manager
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 35);
+    const thirtyFiveDaysAgo = new Date(today);
+    thirtyFiveDaysAgo.setDate(thirtyFiveDaysAgo.getDate() - 30);
+    
+    const ageing30to35 = await prisma.enquiry.findMany({
+      where: {
+        status: 'OPEN',
+        createdAt: {
+          gte: thirtyDaysAgo,
+          lte: thirtyFiveDaysAgo
+        },
+        dealershipId: { not: null }
+      },
+      include: {
+        dealership: {
+          include: {
+            users: {
+              where: {
+                role: { name: 'SALES_MANAGER' },
+                isActive: true
+              },
+              select: {
+                firebaseUid: true,
+                fcmToken: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    for (const enquiry of ageing30to35) {
+      // Notify Sales Managers
+      const salesManagers = enquiry.dealership?.users || [];
+      for (const sm of salesManagers) {
+        if (sm.fcmToken) {
+          await FCMService.sendNotification(sm.fcmToken, {
+            title: '🚨 Aging Enquiry Alert - Sales Manager (30-35 Days)',
+            body: `Enquiry for ${enquiry.customerName} is 30-35 days old`,
+            data: {
+              type: 'aging_alert_sm',
+              entityId: enquiry.id,
+              priority: 'HIGH'
+            }
+          });
+          
+          await this.logNotification(
+            sm.firebaseUid,
+            'Aging Enquiry Alert - Sales Manager (30-35 Days)',
+            `Enquiry for ${enquiry.customerName} is 30-35 days old`,
+            'aging_alert_sm',
+            enquiry.id
+          );
+        }
+      }
+    }
+    
+    // 40+ days open - Notify General Manager
+    const fortyDaysAgo = new Date(today);
+    fortyDaysAgo.setDate(fortyDaysAgo.getDate() - 1000); // All enquiries 40+ days old
+    
+    const ageing40plus = await prisma.enquiry.findMany({
+      where: {
+        status: 'OPEN',
+        createdAt: { lte: fortyDaysAgo },
+        dealershipId: { not: null }
+      },
+      include: {
+        dealership: {
+          include: {
+            users: {
+              where: {
+                role: { name: 'GENERAL_MANAGER' },
+                isActive: true
+              },
+              select: {
+                firebaseUid: true,
+                fcmToken: true,
+                name: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    for (const enquiry of ageing40plus) {
+      // Notify General Managers
+      const generalManagers = enquiry.dealership?.users || [];
+      for (const gm of generalManagers) {
+        if (gm.fcmToken) {
+          await FCMService.sendNotification(gm.fcmToken, {
+            title: '🚨 URGENT: Aging Enquiry Alert - General Manager (40+ Days)',
+            body: `Enquiry for ${enquiry.customerName} is 40+ days old`,
+            data: {
+              type: 'aging_alert_gm',
+              entityId: enquiry.id,
+              priority: 'HIGH'
+            }
+          });
+          
+          await this.logNotification(
+            gm.firebaseUid,
+            'URGENT: Aging Enquiry Alert - General Manager (40+ Days)',
+            `Enquiry for ${enquiry.customerName} is 40+ days old`,
+            'aging_alert_gm',
+            enquiry.id
+          );
+        }
+      }
+    }
+    
+    console.log(`✅ Processed aging alerts: ${ageing20to25.length} (20-25), ${ageing30to35.length} (30-35), ${ageing40plus.length} (40+)`);
+  }
+
+  /**
+   * Process Retail Delay Alerts (Module 6)
+   * 15 Days Post-Booking: If booking is not Retailed/Delivered within 15 days → Notify CA/TL
+   */
+  async processRetailDelayAlerts(): Promise<void> {
+    console.log('🔄 Processing retail delay alerts (15-day post-booking)...');
+    
+    const today = new Date();
+    const fifteenDaysAgo = new Date(today);
+    fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+    
+    // Find bookings created 15+ days ago but not delivered
+    const delayedBookings = await prisma.booking.findMany({
+      where: {
+        createdAt: { lte: fifteenDaysAgo },
+        status: { notIn: ['DELIVERED', 'CANCELLED'] }
+      },
+      include: {
+        advisor: {
+          select: {
+            firebaseUid: true,
+            fcmToken: true,
+            name: true
+          }
+        },
+        enquiry: {
+          include: {
+            createdBy: {
+              include: {
+                manager: {
+                  select: {
+                    firebaseUid: true,
+                    fcmToken: true,
+                    name: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    let notificationCount = 0;
+    for (const booking of delayedBookings) {
+      // Notify CA
+      if (booking.advisorId && booking.advisor?.fcmToken) {
+        await FCMService.sendNotification(booking.advisor.fcmToken, {
+          title: '🚨 Retail Delay Alert',
+          body: `Booking for ${booking.customerName} has not been retailed/delivered within 15 days`,
+          data: {
+            type: 'retail_delay',
+            entityId: booking.id,
+            priority: 'HIGH'
+          }
+        });
+        
+        await this.logNotification(
+          booking.advisorId,
+          'Retail Delay Alert',
+          `Booking for ${booking.customerName} has not been retailed/delivered within 15 days`,
+          'retail_delay',
+          booking.id
+        );
+        
+        notificationCount++;
+      }
+      
+      // Notify TL
+      if (booking.enquiry?.createdBy?.manager?.fcmToken) {
+        await FCMService.sendNotification(booking.enquiry.createdBy.manager.fcmToken, {
+          title: '🚨 Retail Delay Alert',
+          body: `Booking for ${booking.customerName} has not been retailed/delivered within 15 days`,
+          data: {
+            type: 'retail_delay',
+            entityId: booking.id,
+            priority: 'HIGH'
+          }
+        });
+        
+        await this.logNotification(
+          booking.enquiry.createdBy.manager.firebaseUid,
+          'Retail Delay Alert',
+          `Booking for ${booking.customerName} has not been retailed/delivered within 15 days`,
+          'retail_delay',
+          booking.id
+        );
+        
+        notificationCount++;
+      }
+    }
+    
+    console.log(`✅ Processed ${delayedBookings.length} delayed bookings, sent ${notificationCount} notifications`);
+  }
 }
 
 export default new FollowUpNotificationService();

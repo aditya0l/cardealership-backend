@@ -30,15 +30,14 @@ const formatRemarkSnapshot = (roleName: string, remarkText: string, createdAt: D
 };
 
 const updateEntityRemarkSnapshot = async (
-  entityType: 'enquiry' | 'booking',
-  entityId: string,
+  enquiryId: string | null,
+  bookingId: string | null,
   remarkType?: string
 ) => {
-  if (entityType === 'enquiry') {
+  if (enquiryId) {
     const latestRemark = await prisma.remark.findFirst({
       where: {
-        entityType: 'enquiry',
-        entityId,
+        enquiryId,
         isCancelled: false
       },
       orderBy: { createdAt: 'desc' },
@@ -52,7 +51,7 @@ const updateEntityRemarkSnapshot = async (
     });
 
     await prisma.enquiry.update({
-      where: { id: entityId },
+      where: { id: enquiryId },
       data: {
         caRemarks: latestRemark
           ? formatRemarkSnapshot(latestRemark.user.role.name, latestRemark.remark, latestRemark.createdAt)
@@ -62,69 +61,66 @@ const updateEntityRemarkSnapshot = async (
     return;
   }
 
-// Booking snapshot update
-const remarkFieldMap: Record<
-  string,
-  'advisorRemarks' | 'teamLeadRemarks' | 'salesManagerRemarks' | 'generalManagerRemarks' | 'adminRemarks' | 'remarks'
-> = {
-  ca_remarks: 'advisorRemarks',
-  advisor_remarks: 'advisorRemarks',
-  follow_up: 'advisorRemarks',
-  tl_remarks: 'teamLeadRemarks',
-  sm_remarks: 'salesManagerRemarks',
-  gm_remarks: 'generalManagerRemarks',
-  admin_remarks: 'adminRemarks',
-  escalation: 'remarks',
-  status_update: 'remarks'
-};
+  if (bookingId) {
+    // Booking snapshot update
+    const remarkFieldMap: Record<
+      string,
+      'advisorRemarks' | 'teamLeadRemarks' | 'salesManagerRemarks' | 'generalManagerRemarks' | 'adminRemarks' | 'remarks'
+    > = {
+      ca_remarks: 'advisorRemarks',
+      advisor_remarks: 'advisorRemarks',
+      follow_up: 'advisorRemarks',
+      tl_remarks: 'teamLeadRemarks',
+      sm_remarks: 'salesManagerRemarks',
+      gm_remarks: 'generalManagerRemarks',
+      admin_remarks: 'adminRemarks',
+      escalation: 'remarks',
+      status_update: 'remarks'
+    };
 
-  const typesToUpdate = remarkType ? [remarkType] : Object.keys(remarkFieldMap);
-  const updateData: Record<string, string | null> = {};
+    const typesToUpdate = remarkType ? [remarkType] : Object.keys(remarkFieldMap);
+    const updateData: Record<string, string | null> = {};
 
-  for (const type of typesToUpdate) {
-    const fieldName = remarkFieldMap[type as keyof typeof remarkFieldMap] || 'remarks';
-    const latestRemark = await prisma.remark.findFirst({
-      where: {
-        entityType: 'booking',
-        entityId,
-        remarkType: type,
-        isCancelled: false
-      },
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: {
-            role: { select: { name: true } }
+    for (const type of typesToUpdate) {
+      const fieldName = remarkFieldMap[type as keyof typeof remarkFieldMap] || 'remarks';
+      const latestRemark = await prisma.remark.findFirst({
+        where: {
+          bookingId,
+          remarkType: type,
+          isCancelled: false
+        },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: {
+            select: {
+              role: { select: { name: true } }
+            }
           }
         }
-      }
-    });
+      });
 
-    updateData[fieldName] = latestRemark
-      ? formatRemarkSnapshot(latestRemark.user.role.name, latestRemark.remark, latestRemark.createdAt)
-      : null;
-  }
+      updateData[fieldName] = latestRemark
+        ? formatRemarkSnapshot(latestRemark.user.role.name, latestRemark.remark, latestRemark.createdAt)
+        : null;
+    }
 
-  if (Object.keys(updateData).length > 0) {
-    await prisma.booking.update({
-      where: { id: entityId },
-      data: updateData
-    });
+    if (Object.keys(updateData).length > 0) {
+      await prisma.booking.update({
+        where: { id: bookingId },
+        data: updateData
+      });
+    }
   }
 };
 
-// Add remark to enquiry or booking
-export const addRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { entityType, entityId } = req.params;
+// Add remark to enquiry
+export const addEnquiryRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { enquiryId } = req.params;
   const { remark, remarkType = 'ca_remarks' } = req.body;
   const user = req.user;
 
   if (!remark || !remark.trim()) {
     throw createError('Remark text is required', 400);
-  }
-
-  if (!['enquiry', 'booking'].includes(entityType)) {
-    throw createError('Entity type must be either "enquiry" or "booking"', 400);
   }
 
   // Validate remark type based on user role
@@ -133,33 +129,22 @@ export const addRemark = asyncHandler(async (req: AuthenticatedRequest, res: Res
     throw createError(`Invalid remark type for your role. Allowed types: ${allowedTypes.join(', ')}`, 400);
   }
 
-  // Verify entity exists and user has access
-  let entity;
-  if (entityType === 'enquiry') {
-    entity = await prisma.enquiry.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  } else {
-    entity = await prisma.booking.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  }
+  // Verify enquiry exists and user has access
+  const enquiry = await prisma.enquiry.findFirst({
+    where: {
+      id: enquiryId,
+      dealershipId: user.dealershipId
+    }
+  });
 
-  if (!entity) {
-    throw createError(`${entityType} not found or access denied`, 404);
+  if (!enquiry) {
+    throw createError('Enquiry not found or access denied', 404);
   }
 
   // Create remark
   const newRemark = await prisma.remark.create({
     data: {
-      entityType,
-      entityId,
+      enquiryId,
       remark: remark.trim(),
       remarkType,
       createdBy: user.firebaseUid
@@ -167,22 +152,122 @@ export const addRemark = asyncHandler(async (req: AuthenticatedRequest, res: Res
     include: {
       user: {
         select: {
+          firebaseUid: true,
           name: true,
           email: true,
           role: {
-            select: { name: true }
+            select: {
+              id: true,
+              name: true
+            }
           }
         }
       }
     }
   });
 
-  await updateEntityRemarkSnapshot(entityType as 'enquiry' | 'booking', entityId, remarkType);
+  await updateEntityRemarkSnapshot(enquiryId, null, remarkType);
+
+  // Format response to match frontend expectations
+  const formattedRemark = {
+    id: newRemark.id,
+    remark: newRemark.remark,
+    remarkType: newRemark.remarkType || 'enquiry_remark',
+    createdAt: newRemark.createdAt.toISOString(),
+    createdBy: {
+      id: newRemark.user.firebaseUid,
+      name: newRemark.user.name,
+      role: {
+        id: newRemark.user.role?.id || null,
+        name: newRemark.user.role?.name || null
+      }
+    },
+    cancelled: newRemark.isCancelled
+  };
 
   res.status(201).json({
     success: true,
     message: 'Remark added successfully',
-    data: newRemark
+    data: formattedRemark
+  });
+});
+
+// Add remark to booking
+export const addBookingRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { bookingId } = req.params;
+  const { remark, remarkType = 'ca_remarks' } = req.body;
+  const user = req.user;
+
+  if (!remark || !remark.trim()) {
+    throw createError('Remark text is required', 400);
+  }
+
+  // Validate remark type based on user role
+  const allowedTypes = REMARK_TYPES[user.role.name as keyof typeof REMARK_TYPES] || ['ca_remarks'];
+  if (!allowedTypes.includes(remarkType)) {
+    throw createError(`Invalid remark type for your role. Allowed types: ${allowedTypes.join(', ')}`, 400);
+  }
+
+  // Verify booking exists and user has access
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      dealershipId: user.dealershipId
+    }
+  });
+
+  if (!booking) {
+    throw createError('Booking not found or access denied', 404);
+  }
+
+  // Create remark
+  const newRemark = await prisma.remark.create({
+    data: {
+      bookingId,
+      remark: remark.trim(),
+      remarkType,
+      createdBy: user.firebaseUid
+    },
+    include: {
+      user: {
+        select: {
+          firebaseUid: true,
+          name: true,
+          email: true,
+          role: {
+            select: {
+              id: true,
+              name: true
+            }
+          }
+        }
+      }
+    }
+  });
+
+  await updateEntityRemarkSnapshot(null, bookingId, remarkType);
+
+  // Format response to match frontend expectations
+  const formattedRemark = {
+    id: newRemark.id,
+    remark: newRemark.remark,
+    remarkType: newRemark.remarkType || 'booking_remark',
+    createdAt: newRemark.createdAt.toISOString(),
+    createdBy: {
+      id: newRemark.user.firebaseUid,
+      name: newRemark.user.name,
+      role: {
+        id: newRemark.user.role?.id || null,
+        name: newRemark.user.role?.name || null
+      }
+    },
+    cancelled: newRemark.isCancelled
+  };
+
+  res.status(201).json({
+    success: true,
+    message: 'Remark added successfully',
+    data: formattedRemark
   });
 });
 
@@ -208,18 +293,18 @@ export const cancelRemark = asyncHandler(async (req: AuthenticatedRequest, res: 
   }
 
   let entityDealershipId: string | null = null;
-  if (remark.entityType === 'enquiry') {
+  if (remark.enquiryId) {
     const enquiry = await prisma.enquiry.findUnique({
-      where: { id: remark.entityId },
+      where: { id: remark.enquiryId },
       select: { dealershipId: true }
     });
     if (!enquiry) {
       throw createError('Associated enquiry not found', 404);
     }
     entityDealershipId = enquiry.dealershipId || null;
-  } else if (remark.entityType === 'booking') {
+  } else if (remark.bookingId) {
     const booking = await prisma.booking.findUnique({
-      where: { id: remark.entityId },
+      where: { id: remark.bookingId },
       select: { dealershipId: true }
     });
     if (!booking) {
@@ -227,7 +312,7 @@ export const cancelRemark = asyncHandler(async (req: AuthenticatedRequest, res: 
     }
     entityDealershipId = booking.dealershipId || null;
   } else {
-    throw createError('Invalid remark entity type', 400);
+    throw createError('Invalid remark: must have either enquiryId or bookingId', 400);
   }
 
   if (user.dealershipId && entityDealershipId && user.dealershipId !== entityDealershipId) {
@@ -262,57 +347,69 @@ export const cancelRemark = asyncHandler(async (req: AuthenticatedRequest, res: 
       cancellationReason: reason.trim(),
       cancelledAt: new Date(),
       cancelledBy: user.firebaseUid
+    },
+    include: {
+      user: {
+        select: {
+          firebaseUid: true,
+          name: true
+        }
+      },
+      cancelledByUser: {
+        select: {
+          firebaseUid: true,
+          name: true
+        }
+      }
     }
   });
 
   await updateEntityRemarkSnapshot(
-    remark.entityType as 'enquiry' | 'booking',
-    remark.entityId,
+    remark.enquiryId,
+    remark.bookingId,
     remark.remarkType
   );
+
+  // Format response to match frontend expectations
+  const formattedRemark = {
+    id: updatedRemark.id,
+    remark: updatedRemark.remark,
+    cancelled: updatedRemark.isCancelled,
+    cancellationReason: updatedRemark.cancellationReason || null,
+    cancelledAt: updatedRemark.cancelledAt?.toISOString() || null,
+    cancelledBy: updatedRemark.cancelledByUser ? {
+      id: updatedRemark.cancelledByUser.firebaseUid,
+      name: updatedRemark.cancelledByUser.name
+    } : null
+  };
 
   res.json({
     success: true,
     message: 'Remark cancelled successfully',
-    data: updatedRemark
+    data: formattedRemark
   });
 });
 
-// Get remarks history for enquiry or booking
-export const getRemarksHistory = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { entityType, entityId } = req.params;
+// Get remarks history for enquiry
+export const getEnquiryRemarksHistory = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { enquiryId } = req.params;
   const { startDate, endDate, remarkType, page = 1, limit = 50 } = req.query;
   const user = req.user;
 
-  if (!['enquiry', 'booking'].includes(entityType)) {
-    throw createError('Entity type must be either "enquiry" or "booking"', 400);
-  }
+  // Verify enquiry exists and user has access
+  const enquiry = await prisma.enquiry.findFirst({
+    where: {
+      id: enquiryId,
+      dealershipId: user.dealershipId
+    }
+  });
 
-  // Verify entity exists and user has access
-  let entity;
-  if (entityType === 'enquiry') {
-    entity = await prisma.enquiry.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  } else {
-    entity = await prisma.booking.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  }
-
-  if (!entity) {
-    throw createError(`${entityType} not found or access denied`, 404);
+  if (!enquiry) {
+    throw createError('Enquiry not found or access denied', 404);
   }
 
   const where: any = {
-    entityType,
-    entityId
+    enquiryId
   };
 
   // Date filter
@@ -330,26 +427,23 @@ export const getRemarksHistory = asyncHandler(async (req: AuthenticatedRequest, 
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [remarks, total] = await Promise.all([
-    prisma.remark.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            name: true,
-            email: true,
-            role: {
-              select: { name: true }
-            }
+  const remarks = await prisma.remark.findMany({
+    where,
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
           }
         }
-      },
-      orderBy: { createdAt: 'desc' },
-      skip,
-      take: Number(limit)
-    }),
-    prisma.remark.count({ where })
-  ]);
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    skip,
+    take: Number(limit)
+  });
 
   // Group by date for better organization
   const remarksByDate = remarks.reduce((acc, remark) => {
@@ -364,79 +458,119 @@ export const getRemarksHistory = asyncHandler(async (req: AuthenticatedRequest, 
     message: 'Remarks history retrieved successfully',
     data: {
       remarks,
-      remarksByDate,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        totalPages: Math.ceil(total / Number(limit))
-      }
+      remarksByDate
     }
   });
 });
 
-// Update enquiry/booking status with remark
-export const updateStatusWithRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { entityType, entityId } = req.params;
+// Get remarks history for booking
+export const getBookingRemarksHistory = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { bookingId } = req.params;
+  const { startDate, endDate, remarkType, page = 1, limit = 50 } = req.query;
+  const user = req.user;
+
+  // Verify booking exists and user has access
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      dealershipId: user.dealershipId
+    }
+  });
+
+  if (!booking) {
+    throw createError('Booking not found or access denied', 404);
+  }
+
+  const where: any = {
+    bookingId
+  };
+
+  // Date filter
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+
+  // Remark type filter
+  if (remarkType) {
+    where.remarkType = remarkType;
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const remarks = await prisma.remark.findMany({
+    where,
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
+          }
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+    skip,
+    take: Number(limit)
+  });
+
+  // Group by date for better organization
+  const remarksByDate = remarks.reduce((acc, remark) => {
+    const date = remark.createdAt.toISOString().split('T')[0];
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(remark);
+    return acc;
+  }, {} as Record<string, typeof remarks>);
+
+  res.json({
+    success: true,
+    message: 'Remarks history retrieved successfully',
+    data: {
+      remarks,
+      remarksByDate
+    }
+  });
+});
+
+// Update enquiry status with remark
+export const updateEnquiryStatusWithRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { enquiryId } = req.params;
   const { status, remark } = req.body;
   const user = req.user;
 
-  if (!['enquiry', 'booking'].includes(entityType)) {
-    throw createError('Entity type must be either "enquiry" or "booking"', 400);
+  // Verify enquiry exists and user has access
+  const enquiry = await prisma.enquiry.findFirst({
+    where: {
+      id: enquiryId,
+      dealershipId: user.dealershipId
+    },
+    select: { id: true, status: true }
+  });
+
+  if (!enquiry) {
+    throw createError('Enquiry not found or access denied', 404);
   }
 
-  // Verify entity exists and user has access
-  let entity;
-  if (entityType === 'enquiry') {
-    entity = await prisma.enquiry.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      },
-      select: { id: true, status: true }
-    });
-  } else {
-    entity = await prisma.booking.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      },
-      select: { id: true, status: true }
-    });
-  }
+  const oldStatus = enquiry.status;
 
-  if (!entity) {
-    throw createError(`${entityType} not found or access denied`, 404);
-  }
-
-  const oldStatus = entity.status;
-
-  // Update entity status
-  let updatedEntity;
-  if (entityType === 'enquiry') {
-    updatedEntity = await prisma.enquiry.update({
-      where: { id: entityId },
-      data: {
-        status,
-        updatedAt: new Date()
-      }
-    });
-  } else {
-    updatedEntity = await prisma.booking.update({
-      where: { id: entityId },
-      data: {
-        status,
-        updatedAt: new Date()
-      }
-    });
-  }
+  // Update enquiry status
+  const updatedEnquiry = await prisma.enquiry.update({
+    where: { id: enquiryId },
+    data: {
+      status,
+      updatedAt: new Date()
+    }
+  });
 
   // Create remark entry for status change
   const statusRemark = remark || `Status changed from ${oldStatus} to ${status}`;
   const newRemark = await prisma.remark.create({
     data: {
-      entityType,
-      entityId,
+      enquiryId,
       remark: statusRemark,
       remarkType: 'status_update',
       createdBy: user.firebaseUid
@@ -454,25 +588,86 @@ export const updateStatusWithRemark = asyncHandler(async (req: AuthenticatedRequ
     }
   });
 
+  await updateEntityRemarkSnapshot(enquiryId, null, 'status_update');
+
   res.json({
     success: true,
     message: 'Status updated successfully',
     data: {
-      entity: updatedEntity,
+      entity: updatedEnquiry,
       remark: newRemark
     }
   });
 });
 
-// Get team enquiries/bookings with remarks for TL
-export const getTeamEntitiesWithRemarks = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { entityType } = req.params;
-  const { status, category, startDate, endDate, page = 1, limit = 50 } = req.query;
+// Update booking status with remark
+export const updateBookingStatusWithRemark = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { bookingId } = req.params;
+  const { status, remark } = req.body;
   const user = req.user;
 
-  if (!['enquiry', 'booking'].includes(entityType)) {
-    throw createError('Entity type must be either "enquiry" or "booking"', 400);
+  // Verify booking exists and user has access
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      dealershipId: user.dealershipId
+    },
+    select: { id: true, status: true }
+  });
+
+  if (!booking) {
+    throw createError('Booking not found or access denied', 404);
   }
+
+  const oldStatus = booking.status;
+
+  // Update booking status
+  const updatedBooking = await prisma.booking.update({
+    where: { id: bookingId },
+    data: {
+      status,
+      updatedAt: new Date()
+    }
+  });
+
+  // Create remark entry for status change
+  const statusRemark = remark || `Status changed from ${oldStatus} to ${status}`;
+  const newRemark = await prisma.remark.create({
+    data: {
+      bookingId,
+      remark: statusRemark,
+      remarkType: 'status_update',
+      createdBy: user.firebaseUid
+    },
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          role: {
+            select: { name: true }
+          }
+        }
+      }
+    }
+  });
+
+  await updateEntityRemarkSnapshot(null, bookingId, 'status_update');
+
+  res.json({
+    success: true,
+    message: 'Status updated successfully',
+    data: {
+      entity: updatedBooking,
+      remark: newRemark
+    }
+  });
+});
+
+// Get team enquiries with remarks for TL
+export const getTeamEnquiriesWithRemarks = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { status, category, startDate, endDate, page = 1, limit = 50 } = req.query;
+  const user = req.user;
 
   let where: any = {
     dealershipId: user.dealershipId
@@ -490,25 +685,17 @@ export const getTeamEntitiesWithRemarks = asyncHandler(async (req: Authenticated
     });
 
     const teamMemberIds = teamMembers.map(member => member.firebaseUid);
-
-    if (entityType === 'enquiry') {
-      where.OR = [
-        { createdByUserId: user.firebaseUid }, // TL's own enquiries
-        { createdByUserId: { in: teamMemberIds } }, // Team members' enquiries
-        { assignedToUserId: user.firebaseUid }, // Assigned to TL
-        { assignedToUserId: { in: teamMemberIds } } // Assigned to team members
-      ];
-    } else {
-      where.OR = [
-        { advisorId: user.firebaseUid }, // TL's own bookings
-        { advisorId: { in: teamMemberIds } } // Team members' bookings
-      ];
-    }
+    where.OR = [
+      { createdByUserId: user.firebaseUid }, // TL's own enquiries
+      { createdByUserId: { in: teamMemberIds } }, // Team members' enquiries
+      { assignedToUserId: user.firebaseUid }, // Assigned to TL
+      { assignedToUserId: { in: teamMemberIds } } // Assigned to team members
+    ];
   }
 
   // Apply filters
   if (status) where.status = status;
-  if (category && entityType === 'enquiry') where.category = category;
+  if (category) where.category = category;
   if (startDate && endDate) {
     where.createdAt = {
       gte: new Date(startDate as string),
@@ -518,60 +705,146 @@ export const getTeamEntitiesWithRemarks = asyncHandler(async (req: Authenticated
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  let entities;
-  if (entityType === 'enquiry') {
-    entities = await prisma.enquiry.findMany({
-      where,
-      include: {
-        createdBy: { select: { name: true, email: true, role: { select: { name: true } } } },
-        assignedTo: { select: { name: true, email: true, role: { select: { name: true } } } },
-        remarkHistory: {
-          include: {
-            user: { select: { name: true, email: true, role: { select: { name: true } } } }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5 // Latest 5 remarks
-        }
+  const enquiries = await prisma.enquiry.findMany({
+    where,
+    include: {
+      createdBy: { select: { name: true, email: true, role: { select: { name: true } } } },
+      assignedTo: { select: { name: true, email: true, role: { select: { name: true } } } }
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip,
+    take: Number(limit)
+  });
+
+  // Fetch remarks for each enquiry
+  const enquiryIds = enquiries.map(e => e.id);
+  const remarksMap = new Map();
+  if (enquiryIds.length > 0) {
+    const remarks = await prisma.remark.findMany({
+      where: {
+        enquiryId: { in: enquiryIds },
+        isCancelled: false
       },
-      orderBy: { updatedAt: 'desc' },
-      skip,
-      take: Number(limit)
-    });
-  } else {
-    entities = await prisma.booking.findMany({
-      where,
       include: {
-        advisor: { select: { name: true, email: true, role: { select: { name: true } } } },
-        enquiry: { select: { id: true, customerName: true, status: true } },
-        remarkHistory: {
-          include: {
-            user: { select: { name: true, email: true, role: { select: { name: true } } } }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 5 // Latest 5 remarks
-        }
+        user: { select: { name: true, email: true, role: { select: { name: true } } } }
       },
-      orderBy: { updatedAt: 'desc' },
-      skip,
-      take: Number(limit)
+      orderBy: { createdAt: 'desc' }
     });
+
+    for (const remark of remarks) {
+      if (remark.enquiryId) {
+        if (!remarksMap.has(remark.enquiryId)) {
+          remarksMap.set(remark.enquiryId, []);
+        }
+        const existing = remarksMap.get(remark.enquiryId);
+        if (existing.length < 5) {
+          existing.push(remark);
+        }
+      }
+    }
   }
 
-  const total = entityType === 'enquiry' 
-    ? await prisma.enquiry.count({ where })
-    : await prisma.booking.count({ where });
+  const enquiriesWithRemarks = enquiries.map(enquiry => ({
+    ...enquiry,
+    remarkHistory: remarksMap.get(enquiry.id) || []
+  }));
 
   res.json({
     success: true,
-    message: `${entityType}s retrieved successfully`,
+    message: 'Enquiries retrieved successfully',
     data: {
-      entities,
-      pagination: {
-        page: Number(page),
-        limit: Number(limit),
-        total,
-        totalPages: Math.ceil(total / Number(limit))
+      entities: enquiriesWithRemarks
+    }
+  });
+});
+
+// Get team bookings with remarks for TL
+export const getTeamBookingsWithRemarks = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { status, startDate, endDate, page = 1, limit = 50 } = req.query;
+  const user = req.user;
+
+  let where: any = {
+    dealershipId: user.dealershipId
+  };
+
+  // TL can see entities from their team members
+  if (user.role.name === 'TEAM_LEAD') {
+    // Get team members under this TL
+    const teamMembers = await prisma.user.findMany({
+      where: {
+        managerId: user.firebaseUid,
+        isActive: true
+      },
+      select: { firebaseUid: true }
+    });
+
+    const teamMemberIds = teamMembers.map(member => member.firebaseUid);
+    where.OR = [
+      { advisorId: user.firebaseUid }, // TL's own bookings
+      { advisorId: { in: teamMemberIds } } // Team members' bookings
+    ];
+  }
+
+  // Apply filters
+  if (status) where.status = status;
+  if (startDate && endDate) {
+    where.createdAt = {
+      gte: new Date(startDate as string),
+      lte: new Date(endDate as string)
+    };
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const bookings = await prisma.booking.findMany({
+    where,
+    include: {
+      advisor: { select: { name: true, email: true, role: { select: { name: true } } } },
+      enquiry: { select: { id: true, customerName: true, status: true } }
+    },
+    orderBy: { updatedAt: 'desc' },
+    skip,
+    take: Number(limit)
+  });
+
+  // Fetch remarks for each booking
+  const bookingIds = bookings.map(b => b.id);
+  const remarksMap = new Map();
+  if (bookingIds.length > 0) {
+    const remarks = await prisma.remark.findMany({
+      where: {
+        bookingId: { in: bookingIds },
+        isCancelled: false
+      },
+      include: {
+        user: { select: { name: true, email: true, role: { select: { name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    for (const remark of remarks) {
+      if (remark.bookingId) {
+        if (!remarksMap.has(remark.bookingId)) {
+          remarksMap.set(remark.bookingId, []);
+        }
+        const existing = remarksMap.get(remark.bookingId);
+        if (existing.length < 5) {
+          existing.push(remark);
+        }
       }
+    }
+  }
+
+  const bookingsWithRemarks = bookings.map(booking => ({
+    ...booking,
+    remarkHistory: remarksMap.get(booking.id) || []
+  }));
+
+  res.json({
+    success: true,
+    message: 'Bookings retrieved successfully',
+    data: {
+      entities: bookingsWithRemarks
     }
   });
 });
@@ -589,17 +862,22 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
     teamMemberIds = await getTeamMemberIds(user.firebaseUid, false);
   }
 
+  // Build where clause - handle null dealershipId
   const enquiryWhere: any = {
-    dealershipId: user.dealershipId,
     status: EnquiryStatus.OPEN
   };
+  if (user.dealershipId) {
+    enquiryWhere.dealershipId = user.dealershipId;
+  }
 
   const bookingWhere: any = {
-    dealershipId: user.dealershipId,
     status: {
       notIn: [BookingStatus.CANCELLED, BookingStatus.DELIVERED]
     }
   };
+  if (user.dealershipId) {
+    bookingWhere.dealershipId = user.dealershipId;
+  }
 
   const setScopedFilters = () => {
     switch (user.role.name as RoleName) {
@@ -649,6 +927,7 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
 
   setScopedFilters();
 
+  // Filter by next follow-up date (columns should exist after running add-missing-columns script)
   enquiryWhere.AND = [
     {
       OR: [
@@ -667,16 +946,24 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
     }
   ];
 
-  const [enquiries, bookings] = await Promise.all([
-    prisma.enquiry.findMany({
-      where: enquiryWhere,
-      select: { id: true }
-    }),
-    prisma.booking.findMany({
-      where: bookingWhere,
-      select: { id: true }
-    })
-  ]);
+  let enquiries, bookings;
+  try {
+    [enquiries, bookings] = await Promise.all([
+      prisma.enquiry.findMany({
+        where: enquiryWhere,
+        select: { id: true }
+      }),
+      prisma.booking.findMany({
+        where: bookingWhere,
+        select: { id: true }
+      })
+    ]);
+  } catch (error: any) {
+    console.error('Error fetching pending summary:', error);
+    console.error('Enquiry where:', JSON.stringify(enquiryWhere, null, 2));
+    console.error('Booking where:', JSON.stringify(bookingWhere, null, 2));
+    throw createError(`Failed to fetch pending summary: ${error.message}`, 400);
+  }
 
   const enquiryIds = enquiries.map(e => e.id);
   const bookingIds = bookings.map(b => b.id);
@@ -685,8 +972,7 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
     enquiryIds.length
       ? prisma.remark.findMany({
           where: {
-            entityType: 'enquiry',
-            entityId: { in: enquiryIds },
+            enquiryId: { in: enquiryIds },
             createdBy: user.firebaseUid,
             isCancelled: false,
             createdAt: {
@@ -694,14 +980,13 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
               lte: endOfDay
             }
           },
-          select: { entityId: true }
+          select: { enquiryId: true }
         })
       : [],
     bookingIds.length
       ? prisma.remark.findMany({
           where: {
-            entityType: 'booking',
-            entityId: { in: bookingIds },
+            bookingId: { in: bookingIds },
             createdBy: user.firebaseUid,
             isCancelled: false,
             createdAt: {
@@ -709,13 +994,13 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
               lte: endOfDay
             }
           },
-          select: { entityId: true }
+          select: { bookingId: true }
         })
       : []
   ]);
 
-  const completedEnquiryIdSet = new Set(completedEnquiries.map(item => item.entityId));
-  const completedBookingIdSet = new Set(completedBookings.map(item => item.entityId));
+  const completedEnquiryIdSet = new Set(completedEnquiries.map(item => item.enquiryId).filter(Boolean));
+  const completedBookingIdSet = new Set(completedBookings.map(item => item.bookingId).filter(Boolean));
 
   const pendingEnquiryIds = enquiryIds.filter(id => !completedEnquiryIdSet.has(id));
   const pendingBookingIds = bookingIds.filter(id => !completedBookingIdSet.has(id));
@@ -733,49 +1018,32 @@ export const getPendingUpdatesSummary = asyncHandler(async (req: AuthenticatedRe
   });
 });
 
-// Get remark statistics
-export const getRemarkStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-  const { entityType, entityId } = req.params;
+// Get enquiry remark statistics
+export const getEnquiryRemarkStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { enquiryId } = req.params;
   const user = req.user;
 
-  if (!['enquiry', 'booking'].includes(entityType)) {
-    throw createError('Entity type must be either "enquiry" or "booking"', 400);
+  // Verify enquiry exists and user has access
+  const enquiry = await prisma.enquiry.findFirst({
+    where: {
+      id: enquiryId,
+      dealershipId: user.dealershipId
+    }
+  });
+
+  if (!enquiry) {
+    throw createError('Enquiry not found or access denied', 404);
   }
 
-  // Verify entity exists and user has access
-  let entity;
-  if (entityType === 'enquiry') {
-    entity = await prisma.enquiry.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  } else {
-    entity = await prisma.booking.findFirst({
-      where: {
-        id: entityId,
-        dealershipId: user.dealershipId
-      }
-    });
-  }
-
-  if (!entity) {
-    throw createError(`${entityType} not found or access denied`, 404);
-  }
-
-  const [totalRemarks, typeStats, recentRemarks] = await Promise.all([
-    prisma.remark.count({
-      where: { entityType, entityId }
-    }),
+  const [typeStats, recentRemarks] = await Promise.all([
     prisma.remark.groupBy({
       by: ['remarkType'],
-      where: { entityType, entityId },
+      where: { enquiryId },
       _count: true,
       orderBy: { _count: { remarkType: 'desc' } }
     }),
     prisma.remark.findMany({
-      where: { entityType, entityId },
+      where: { enquiryId },
       include: {
         user: { select: { name: true, role: { select: { name: true } } } }
       },
@@ -788,7 +1056,53 @@ export const getRemarkStats = asyncHandler(async (req: AuthenticatedRequest, res
     success: true,
     message: 'Remark statistics retrieved successfully',
     data: {
-      totalRemarks,
+      typeBreakdown: typeStats.map(stat => ({
+        type: stat.remarkType,
+        count: stat._count
+      })),
+      recentRemarks
+    }
+  });
+});
+
+// Get booking remark statistics
+export const getBookingRemarkStats = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { bookingId } = req.params;
+  const user = req.user;
+
+  // Verify booking exists and user has access
+  const booking = await prisma.booking.findFirst({
+    where: {
+      id: bookingId,
+      dealershipId: user.dealershipId
+    }
+  });
+
+  if (!booking) {
+    throw createError('Booking not found or access denied', 404);
+  }
+
+  const [typeStats, recentRemarks] = await Promise.all([
+    prisma.remark.groupBy({
+      by: ['remarkType'],
+      where: { bookingId },
+      _count: true,
+      orderBy: { _count: { remarkType: 'desc' } }
+    }),
+    prisma.remark.findMany({
+      where: { bookingId },
+      include: {
+        user: { select: { name: true, role: { select: { name: true } } } }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    })
+  ]);
+
+  res.json({
+    success: true,
+    message: 'Remark statistics retrieved successfully',
+    data: {
       typeBreakdown: typeStats.map(stat => ({
         type: stat.remarkType,
         count: stat._count

@@ -1,27 +1,26 @@
-customer_name,customer_phone,customer_email,dealer_code,variant,color,zone,region,booking_date,expected_delivery_date,advisor_id,finance_required,financer_name,stock_availability,fuel_type,transmission
-Rajesh Kumar,+919876543210,rajesh.kumar@example.com,TATA001,Tata Harrier EV Adventure,Blue,NORTH,Delhi,2025-10-09,2025-10-25,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Priya Sharma,+919876543211,priya.sharma@example.com,TATA001,Tata Nexon EV Max,Red,SOUTH,Bangalore,2025-10-09,2025-10-30,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Amit Patel,+919876543212,amit.patel@example.com,TATA001,Tata Punch EV,White,WEST,Mumbai,2025-10-09,2025-10-28,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Sunita Verma,+919876543213,sunita.verma@example.com,TATA001,Tata Tigor EV,Black,EAST,Kolkata,2025-10-10,2025-11-01,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VNA,Electric,Automatic
-Vikram Singh,+919876543214,vikram.singh@example.com,TATA001,Tata Harrier EV Adventure,Silver,NORTH,Delhi,2025-10-10,2025-10-27,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,Electric,Automatic
-Anjali Reddy,+919876543215,anjali.reddy@example.com,TATA001,Tata Nexon EV Prime,Orange,SOUTH,Chennai,2025-10-10,2025-11-05,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Karan Kapoor,+919876543216,karan.kapoor@example.com,TATA001,Tata Curvv EV,Grey,WEST,Pune,2025-10-11,2025-11-10,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Deepika Menon,+919876543217,deepika.menon@example.com,TATA001,Tata Harrier EV Adventure,Green,SOUTH,Hyderabad,2025-10-11,2025-10-29,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Rohit Malhotra,+919876543218,rohit.malhotra@example.com,TATA001,Tata Nexon EV Max,Blue,NORTH,Chandigarh,2025-10-11,2025-11-08,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VNA,Electric,Automatic
-Neha Gupta,+919876543219,neha.gupta@example.com,TATA001,Tata Punch EV,Pink,WEST,Ahmedabad,2025-10-12,2025-11-15,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Arjun Desai,+919876543220,arjun.desai@example.com,TATA001,Tata Tigor EV,White,SOUTH,Bangalore,2025-10-12,2025-11-02,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Meera Iyer,+919876543221,meera.iyer@example.com,TATA001,Tata Harrier EV Adventure,Black,EAST,Bhubaneswar,2025-10-12,2025-11-12,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,Electric,Automatic
-Sanjay Chopra,+919876543222,sanjay.chopra@example.com,TATA001,Tata Nexon EV Prime,Silver,NORTH,Jaipur,2025-10-13,2025-11-20,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Kavita Nair,+919876543223,kavita.nair@example.com,TATA001,Tata Curvv EV,Blue,SOUTH,Kochi,2025-10-13,2025-10-31,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VNA,Electric,Automatic
-Ravi Shankar,+919876543224,ravi.shankar@example.com,TATA001,Tata Harrier EV Adventure,Red,WEST,Surat,2025-10-13,2025-11-18,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Divya Krishnan,+919876543225,divya.krishnan@example.com,TATA001,Tata Punch EV,Yellow,EAST,Guwahati,2025-10-14,2025-11-25,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Manish Joshi,+919876543226,manish.joshi@example.com,TATA001,Tata Nexon EV Max,White,NORTH,Lucknow,2025-10-14,2025-11-03,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Pooja Agarwal,+919876543227,pooja.agarwal@example.com,TATA001,Tata Tigor EV,Grey,SOUTH,Coimbatore,2025-10-14,2025-11-22,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Ashok Mehta,+919876543228,ashok.mehta@example.com,TATA001,Tata Harrier EV Adventure,Brown,WEST,Nagpur,2025-10-15,2025-11-14,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VNA,Electric,Automatic
-Lakshmi Pillai,+919876543229,lakshmi.pillai@example.com,TATA001,Tata Curvv EV,Green,SOUTH,Trivandrum,2025-10-15,2025-11-07,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,Electric,Automatic
-Rahul Bhatt,+919876543230,rahul.bhatt@example.com,TATA001,Tata Nexon EV Prime,Blue,NORTH,Dehradun,2025-10-15,2025-11-28,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Sneha Rao,+919876543231,sneha.rao@example.com,TATA001,Tata Punch EV,Red,WEST,Indore,2025-10-16,2025-11-11,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-Gaurav Saxena,+919876543232,gaurav.saxena@example.com,TATA001,Tata Harrier EV Adventure,White,EAST,Patna,2025-10-16,2025-11-19,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,Electric,Automatic
-Rekha Bansal,+919876543233,rekha.bansal@example.com,TATA001,Tata Tigor EV,Silver,NORTH,Amritsar,2025-10-16,2025-11-06,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VNA,Electric,Automatic
-Nikhil Pandey,+919876543234,nikhil.pandey@example.com,TATA001,Tata Nexon EV Max,Orange,SOUTH,Mangalore,2025-10-17,2025-11-23,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,Electric,Automatic
-
+customer_name,customer_phone,customer_email,dealer_code,variant,color,zone,region,booking_date,expected_delivery_date,advisor_id,finance_required,financer_name,stock_availability,chassis_number,allocation_order_number,fuel_type,transmission
+Rajesh Kumar,+919876543210,rajesh.kumar@example.com,TATA001,Tata Harrier EV Adventure,Blue,NORTH,Delhi,2025-10-09,2025-10-25,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,CH123456789,,Electric,Automatic
+Priya Sharma,+919876543211,priya.sharma@example.com,TATA001,Tata Nexon EV Max,Red,SOUTH,Bangalore,2025-10-09,2025-10-30,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456790,,Electric,Automatic
+Amit Patel,+919876543212,amit.patel@example.com,TATA001,Tata Punch EV,White,WEST,Mumbai,2025-10-09,2025-10-28,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,CH123456791,,Electric,Automatic
+Sunita Verma,+919876543213,sunita.verma@example.com,TATA001,Tata Tigor EV,Black,EAST,Kolkata,2025-10-10,2025-11-01,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VNA,,ORD123456,Electric,Automatic
+Vikram Singh,+919876543214,vikram.singh@example.com,TATA001,Tata Harrier EV Adventure,Silver,NORTH,Delhi,2025-10-10,2025-10-27,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,CH123456792,,Electric,Automatic
+Anjali Reddy,+919876543215,anjali.reddy@example.com,TATA001,Tata Nexon EV Prime,Orange,SOUTH,Chennai,2025-10-10,2025-11-05,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VEHICLE_AVAILABLE,CH123456793,,Electric,Automatic
+Karan Kapoor,+919876543216,karan.kapoor@example.com,TATA001,Tata Curvv EV,Grey,WEST,Pune,2025-10-11,2025-11-10,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456794,,Electric,Automatic
+Deepika Menon,+919876543217,deepika.menon@example.com,TATA001,Tata Harrier EV Adventure,Green,SOUTH,Hyderabad,2025-10-11,2025-10-29,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VEHICLE_AVAILABLE,CH123456795,,Electric,Automatic
+Rohit Malhotra,+919876543218,rohit.malhotra@example.com,TATA001,Tata Nexon EV Max,Blue,NORTH,Chandigarh,2025-10-11,2025-11-08,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VNA,,ORD123457,Electric,Automatic
+Neha Gupta,+919876543219,neha.gupta@example.com,TATA001,Tata Punch EV,Pink,WEST,Ahmedabad,2025-10-12,2025-11-15,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456796,,Electric,Automatic
+Arjun Desai,+919876543220,arjun.desai@example.com,TATA001,Tata Tigor EV,White,SOUTH,Bangalore,2025-10-12,2025-11-02,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,CH123456797,,Electric,Automatic
+Meera Iyer,+919876543221,meera.iyer@example.com,TATA001,Tata Harrier EV Adventure,Black,EAST,Bhubaneswar,2025-10-12,2025-11-12,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,CH123456798,,Electric,Automatic
+Sanjay Chopra,+919876543222,sanjay.chopra@example.com,TATA001,Tata Nexon EV Prime,Silver,NORTH,Jaipur,2025-10-13,2025-11-20,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456799,,Electric,Automatic
+Kavita Nair,+919876543223,kavita.nair@example.com,TATA001,Tata Curvv EV,Blue,SOUTH,Kochi,2025-10-13,2025-10-31,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VNA,,ORD123458,Electric,Automatic
+Ravi Shankar,+919876543224,ravi.shankar@example.com,TATA001,Tata Harrier EV Adventure,Red,WEST,Surat,2025-10-13,2025-11-18,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,CH123456800,,Electric,Automatic
+Divya Krishnan,+919876543225,divya.krishnan@example.com,TATA001,Tata Punch EV,Yellow,EAST,Guwahati,2025-10-14,2025-11-25,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456801,,Electric,Automatic
+Manish Joshi,+919876543226,manish.joshi@example.com,TATA001,Tata Nexon EV Max,White,NORTH,Lucknow,2025-10-14,2025-11-03,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VEHICLE_AVAILABLE,CH123456802,,Electric,Automatic
+Pooja Agarwal,+919876543227,pooja.agarwal@example.com,TATA001,Tata Tigor EV,Grey,SOUTH,Coimbatore,2025-10-14,2025-11-22,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,ICICI Bank,VEHICLE_AVAILABLE,CH123456803,,Electric,Automatic
+Ashok Mehta,+919876543228,ashok.mehta@example.com,TATA001,Tata Harrier EV Adventure,Brown,WEST,Nagpur,2025-10-15,2025-11-14,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VNA,,ORD123459,Electric,Automatic
+Lakshmi Pillai,+919876543229,lakshmi.pillai@example.com,TATA001,Tata Curvv EV,Green,SOUTH,Trivandrum,2025-10-15,2025-11-07,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,SBI,VEHICLE_AVAILABLE,CH123456804,,Electric,Automatic
+Rahul Bhatt,+919876543230,rahul.bhatt@example.com,TATA001,Tata Nexon EV Prime,Blue,NORTH,Dehradun,2025-10-15,2025-11-28,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Axis Bank,VEHICLE_AVAILABLE,CH123456805,,Electric,Automatic
+Sneha Rao,+919876543231,sneha.rao@example.com,TATA001,Tata Punch EV,Red,WEST,Indore,2025-10-16,2025-11-11,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456806,,Electric,Automatic
+Gaurav Saxena,+919876543232,gaurav.saxena@example.com,TATA001,Tata Harrier EV Adventure,White,EAST,Patna,2025-10-16,2025-11-19,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,HDFC Bank,VEHICLE_AVAILABLE,CH123456807,,Electric,Automatic
+Rekha Bansal,+919876543233,rekha.bansal@example.com,TATA001,Tata Tigor EV,Silver,NORTH,Amritsar,2025-10-16,2025-11-06,bPqDAnO0o6WGNR4WR19l7TLEz2d2,true,Kotak Bank,VNA,,ORD123460,Electric,Automatic
+Nikhil Pandey,+919876543234,nikhil.pandey@example.com,TATA001,Tata Nexon EV Max,Orange,SOUTH,Mangalore,2025-10-17,2025-11-23,bPqDAnO0o6WGNR4WR19l7TLEz2d2,false,,VEHICLE_AVAILABLE,CH123456808,,Electric,Automatic
