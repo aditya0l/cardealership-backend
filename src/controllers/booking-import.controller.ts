@@ -171,7 +171,7 @@ export const uploadImportFile = [
         const batch = validRows.slice(i, i + 500);
         const batchResult = await BookingImportService.processBatch(
           batch,
-          importRecord.id,
+      importRecord.id,
           i,
           admin.dealershipId
         );
@@ -229,13 +229,13 @@ export const uploadImportFile = [
         fs.unlinkSync(filePath);
       }
 
-      res.status(201).json({
-        success: true,
+    res.status(201).json({
+      success: true,
         message: 'File uploaded and processed successfully',
-        data: {
-          importId: importRecord.id,
-          filename: originalname,
-          fileSize: size,
+      data: {
+        importId: importRecord.id,
+        filename: originalname,
+        fileSize: size,
           status: ImportStatus.COMPLETED,
           totalRows: parseResult.totalRows,
           successfulRows: totalSuccessful,
@@ -250,8 +250,8 @@ export const uploadImportFile = [
         data: {
           status: ImportStatus.FAILED,
           completedAt: new Date()
-        }
-      });
+      }
+    });
 
       // Clean up uploaded file
       if (fs.existsSync(filePath)) {

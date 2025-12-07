@@ -362,6 +362,72 @@ class NotificationTriggerService {
       );
     }
   }
+
+  // Task 5: Trigger notification for enquiry category change (HOT → BOOKED/LOST)
+  async triggerEnquiryCategoryChangeNotification(
+    enquiry: any,
+    oldCategory: string,
+    newCategory: string,
+    notifyRoles: 'TL' | 'TL_SM'
+  ): Promise<void> {
+    const { id, customerName, model, variant, dealershipId, assignedToUserId } = enquiry;
+    
+    if (!dealershipId) {
+      console.warn('No dealershipId found for category change notification:', id);
+      return;
+    }
+
+    const title = `Enquiry ${newCategory} - ${customerName}`;
+    const body = `${model} ${variant} - Changed from ${oldCategory} to ${newCategory}`;
+
+    // Get users to notify based on roles
+    const usersToNotify: string[] = [];
+
+    if (notifyRoles === 'TL' || notifyRoles === 'TL_SM') {
+      // Get Team Leads
+      const teamLeads = await prisma.user.findMany({
+        where: {
+          dealershipId,
+          role: { name: 'TEAM_LEAD' },
+          isActive: true
+        },
+        select: { firebaseUid: true }
+      });
+      usersToNotify.push(...teamLeads.map(u => u.firebaseUid));
+    }
+
+    if (notifyRoles === 'TL_SM') {
+      // Get Sales Managers
+      const salesManagers = await prisma.user.findMany({
+        where: {
+          dealershipId,
+          role: { name: 'SALES_MANAGER' },
+          isActive: true
+        },
+        select: { firebaseUid: true }
+      });
+      usersToNotify.push(...salesManagers.map(u => u.firebaseUid));
+    }
+
+    // Also notify assigned advisor if exists
+    if (assignedToUserId) {
+      usersToNotify.push(assignedToUserId);
+    }
+
+    // Remove duplicates
+    const uniqueUserIds = [...new Set(usersToNotify)];
+
+    if (uniqueUserIds.length > 0) {
+      await this.sendNotificationToUsers(
+        uniqueUserIds,
+        title,
+        body,
+        'enquiry_category_change',
+        id,
+        'HIGH'
+      );
+    }
+  }
 }
 
 export default new NotificationTriggerService();

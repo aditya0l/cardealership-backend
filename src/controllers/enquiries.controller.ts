@@ -23,6 +23,42 @@ enum EnquirySource {
   OTHER = 'OTHER'
 }
 
+// Source mapping from frontend labels to backend enum values (Task 1)
+const SOURCE_MAPPING: Record<string, EnquirySource> = {
+  'Showroom Walk-in': EnquirySource.SHOWROOM_VISIT,
+  'Digital': EnquirySource.DIGITAL,
+  'BTL Activity': EnquirySource.BTL_ACTIVITY,
+  'Tele-in': EnquirySource.PHONE_CALL,
+  'Referral': EnquirySource.REFERRAL
+};
+
+// Allowed source values (final list)
+const ALLOWED_SOURCES = Object.values(SOURCE_MAPPING);
+
+// Helper function to map and validate source
+function mapAndValidateSource(source: string | EnquirySource): EnquirySource {
+  // If already a valid enum value, use it
+  if (Object.values(EnquirySource).includes(source as EnquirySource)) {
+    const enumValue = source as EnquirySource;
+    // Check if it's in the allowed list
+    if (ALLOWED_SOURCES.includes(enumValue)) {
+      return enumValue;
+    }
+  }
+  
+  // Try mapping from frontend label
+  const mapped = SOURCE_MAPPING[source];
+  if (mapped) {
+    return mapped;
+  }
+  
+  // If not in allowed list, throw error
+  throw createError(
+    `Invalid source. Allowed values: ${Object.keys(SOURCE_MAPPING).join(', ')}`,
+    400
+  );
+}
+
 interface CreateEnquiryRequest {
   customerName: string;
   customerContact: string;
@@ -81,8 +117,9 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     throw createError('Customer name and contact are required', 400);
   }
 
+  // Task 3: EDB is mandatory
   if (!expectedBookingDate) {
-    throw createError('Expected booking date is required', 400);
+    throw createError('Expected booking date (EDB) is mandatory', 400);
   }
 
   // Validate email format if provided
@@ -113,8 +150,10 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     }
   }
 
-  if (source && !Object.values(EnquirySource).includes(source)) {
-    throw createError('Invalid enquiry source', 400);
+  // Map and validate source (Task 1: Source dropdown mapping)
+  let mappedSource: EnquirySource | undefined;
+  if (source) {
+    mappedSource = mapAndValidateSource(source);
   }
 
   // Parse expected booking date if provided
@@ -129,17 +168,20 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     throw createError('Expected booking date cannot be in the past', 400);
   }
 
-  let parsedNextFollowUpDate: Date | undefined;
-  if (nextFollowUpDate) {
-    parsedNextFollowUpDate = new Date(nextFollowUpDate);
-    if (isNaN(parsedNextFollowUpDate.getTime())) {
-      throw createError('Invalid next follow up date format', 400);
-    }
-    const nextFollowUpStart = new Date(parsedNextFollowUpDate);
-    nextFollowUpStart.setHours(0, 0, 0, 0);
-    if (nextFollowUpStart < today) {
-      throw createError('Next follow up date cannot be before today', 400);
-    }
+  // Task 3: Follow-up date is mandatory
+  if (!nextFollowUpDate) {
+    throw createError('Follow-up date is mandatory', 400);
+  }
+
+  let parsedNextFollowUpDate: Date;
+  parsedNextFollowUpDate = new Date(nextFollowUpDate);
+  if (isNaN(parsedNextFollowUpDate.getTime())) {
+    throw createError('Invalid next follow up date format', 400);
+  }
+  const nextFollowUpStart = new Date(parsedNextFollowUpDate);
+  nextFollowUpStart.setHours(0, 0, 0, 0);
+  if (nextFollowUpStart < today) {
+    throw createError('Follow-up date cannot be in the past', 400);
   }
 
   // Validate category if provided
@@ -166,7 +208,7 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     model,
     variant,
     color,
-    source: (source || EnquirySource.WALK_IN) as any,
+    source: (mappedSource || EnquirySource.WALK_IN) as any,
     expectedBookingDate: parsedBookingDate,
     caRemarks,
     assignedToUserId,
@@ -174,7 +216,7 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     category: category || EnquiryCategory.HOT,
     dealerCode: resolvedDealerCode ?? null,
     location: location || null,
-    nextFollowUpDate: parsedNextFollowUpDate || parsedBookingDate,
+    nextFollowUpDate: parsedNextFollowUpDate, // Task 3: Now mandatory
     dealershipId: resolvedDealershipId
   };
 
@@ -345,17 +387,14 @@ export const getEnquiryById = asyncHandler(async (req: AuthenticatedRequest, res
     throw createError('You can only access enquiries you created', 403);
   }
 
-  // Fetch remarks using enquiryId
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+  // Task 4: Fetch last 3-5 remarks (chronologically, not by date)
   const remarks = await prisma.remark.findMany({
     where: {
       enquiryId: id,
-      isCancelled: false,
-      createdAt: {
-        gte: threeDaysAgo
-      }
+      isCancelled: false
     },
     orderBy: { createdAt: 'desc' },
+    take: 5, // Last 5 remarks
     include: {
       user: {
         select: {
@@ -466,6 +505,56 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     throw createError('Cannot update closed enquiry. Entry is locked.', 403);
   }
 
+  // Task 8: Enhanced locking - Block all updates except remarks for Booked/Lost enquiries
+  if (existingEnquiry.category === EnquiryCategory.BOOKED || 
+      existingEnquiry.category === EnquiryCategory.LOST) {
+    // Allow only remark additions
+    const allowedFields = ['caRemarks'];
+    const updateFieldsObj: any = {
+      customerName,
+      customerContact,
+      customerEmail,
+      model,
+      variant,
+      color,
+      source,
+      expectedBookingDate,
+      caRemarks,
+      status,
+      assignedToUserId,
+      category,
+      dealerCode,
+      location,
+      nextFollowUpDate
+    };
+    const updateKeys = Object.keys(updateFieldsObj).filter(key => updateFieldsObj[key] !== undefined);
+    
+    const hasOnlyRemarks = updateKeys.every(key => allowedFields.includes(key));
+    
+    if (!hasOnlyRemarks) {
+      throw createError(
+        'Cannot update booked/lost enquiry. Entry is locked. Only remarks can be added.',
+        403
+      );
+    }
+  }
+
+  // Task 2: Block updates to vehicle details if imported from quotation CSV
+  if (existingEnquiry.isImportedFromQuotation) {
+    const protectedFields: string[] = [];
+    if (model !== undefined) protectedFields.push('model');
+    if (variant !== undefined) protectedFields.push('variant');
+    if (color !== undefined) protectedFields.push('color');
+    // Note: fuelType is not in UpdateEnquiryRequest yet, but will be protected when added
+    
+    if (protectedFields.length > 0) {
+      throw createError(
+        `Cannot update vehicle details imported from quotation CSV. Fields are read-only: ${protectedFields.join(', ')}`,
+        403
+      );
+    }
+  }
+
   const dealershipContext = await resolveDealershipContext(
     req.user.legacyDealershipId ?? req.user.dealershipId
   );
@@ -490,18 +579,20 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
   if (model !== undefined) updateFields.model = model;
   if (variant !== undefined) updateFields.variant = variant;
   if (color !== undefined) updateFields.color = color;
+  // Map and validate source (Task 1: Source dropdown mapping)
   if (source !== undefined) {
-    if (!Object.values(EnquirySource).includes(source)) {
-      throw createError('Invalid enquiry source', 400);
-    }
-    updateFields.source = source as any;
+    const mappedSource = mapAndValidateSource(source);
+    updateFields.source = mappedSource as any;
   }
   if (caRemarks !== undefined) updateFields.caRemarks = caRemarks;
   if (dealerCode !== undefined) updateFields.dealerCode = dealerCode;
   if (location !== undefined) updateFields.location = location ?? null;
   
-  // Parse expected booking date if provided
-  if (expectedBookingDate) {
+  // Task 3: EDB is mandatory - validate if provided or use existing
+  if (expectedBookingDate !== undefined) {
+    if (!expectedBookingDate) {
+      throw createError('Expected booking date (EDB) is mandatory and cannot be removed', 400);
+    }
     const date = new Date(expectedBookingDate);
     if (isNaN(date.getTime())) {
       throw createError('Invalid expected booking date format', 400);
@@ -514,22 +605,27 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     updateFields.expectedBookingDate = date;
   }
 
+  // Task 3: Follow-up date is mandatory in updates too
   if (nextFollowUpDate !== undefined) {
-    if (nextFollowUpDate) {
-      const parsedNextFollowUp = new Date(nextFollowUpDate);
-      if (isNaN(parsedNextFollowUp.getTime())) {
-        throw createError('Invalid next follow up date format', 400);
-      }
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      parsedNextFollowUp.setHours(0, 0, 0, 0);
-      if (parsedNextFollowUp < today) {
-        throw createError('Next follow up date cannot be before today', 400);
-      }
-      updateFields.nextFollowUpDate = parsedNextFollowUp;
-    } else {
-      updateFields.nextFollowUpDate = null;
+    if (!nextFollowUpDate) {
+      throw createError('Follow-up date is mandatory and cannot be removed', 400);
     }
+    const parsedNextFollowUp = new Date(nextFollowUpDate);
+    if (isNaN(parsedNextFollowUp.getTime())) {
+      throw createError('Invalid next follow up date format', 400);
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    parsedNextFollowUp.setHours(0, 0, 0, 0);
+    if (parsedNextFollowUp < today) {
+      throw createError('Follow-up date cannot be in the past', 400);
+    }
+    updateFields.nextFollowUpDate = parsedNextFollowUp;
+  }
+  
+  // Task 3: Ensure EDB is also set if not provided in update
+  if (expectedBookingDate === undefined && !existingEnquiry.expectedBookingDate) {
+    throw createError('Expected booking date (EDB) is mandatory', 400);
   }
   
   // Update other fields
@@ -697,6 +793,29 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
         existingEnquiry.status, 
         status
       );
+    }
+
+    // Task 5: Trigger notifications for category changes
+    if (category && category !== existingEnquiry.category) {
+      // HOT → BOOKED: Notify TL
+      if (category === EnquiryCategory.BOOKED && existingEnquiry.category === EnquiryCategory.HOT) {
+        await NotificationTriggerService.triggerEnquiryCategoryChangeNotification(
+          enquiry,
+          'HOT',
+          'BOOKED',
+          'TL' // Notify Team Lead
+        );
+      }
+      
+      // HOT → LOST: Notify TL + SM
+      if (category === EnquiryCategory.LOST && existingEnquiry.category === EnquiryCategory.HOT) {
+        await NotificationTriggerService.triggerEnquiryCategoryChangeNotification(
+          enquiry,
+          'HOT',
+          'LOST',
+          'TL_SM' // Notify Team Lead + Sales Manager
+        );
+      }
     }
 
     // Trigger notification for new booking if created

@@ -774,17 +774,26 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       const firebaseUser = await auth.getUser(user.firebaseUid);
       
       // For development, we'll accept the known test passwords
-      const validPasswords = {
+      const validPasswords: Record<string, string> = {
         'admin@cardealership.com': 'Admin123!',
         'gm@cardealership.com': 'GeneralManager123!',
         'sm@cardealership.com': 'SalesManager123!',
         'tl@cardealership.com': 'TeamLead123!',
         'advisor@cardealership.com': 'Advisor123!',
         'admin.new@test.com': 'testpassword123',
-        'advisor.new@test.com': 'testpassword123'
+        'advisor.new@test.com': 'testpassword123',
+        // New test users (created by create-users-by-role.ts)
+        'admin@test.com': 'admin123',
+        'gm@test.com': 'gm12345',
+        'sm@test.com': 'sm12345',
+        'tl@test.com': 'tl12345',
+        'ca1@test.com': 'ca12345',
+        'ca2@test.com': 'ca12345'
       };
 
-      if (validPasswords[email as keyof typeof validPasswords] !== password) {
+      // Check if password matches
+      const expectedPassword = validPasswords[email];
+      if (!expectedPassword || expectedPassword !== password) {
         throw createError('Invalid email or password', 401);
       }
 

@@ -141,6 +141,18 @@ export const addEnquiryRemark = asyncHandler(async (req: AuthenticatedRequest, r
     throw createError('Enquiry not found or access denied', 404);
   }
 
+  // Task 4: Check total remark limit (20 max)
+  const totalRemarks = await prisma.remark.count({
+    where: {
+      enquiryId,
+      isCancelled: false
+    }
+  });
+
+  if (totalRemarks >= 20) {
+    throw createError('Maximum 20 remarks allowed per enquiry', 400);
+  }
+
   // Create remark
   const newRemark = await prisma.remark.create({
     data: {
@@ -167,6 +179,23 @@ export const addEnquiryRemark = asyncHandler(async (req: AuthenticatedRequest, r
   });
 
   await updateEntityRemarkSnapshot(enquiryId, null, remarkType);
+
+  // Task 4: Mark older remarks as non-editable (keep last 5 editable)
+  const allRemarks = await prisma.remark.findMany({
+    where: {
+      enquiryId,
+      isCancelled: false
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  // Mark remarks beyond the 5th as non-editable
+  for (let i = 5; i < allRemarks.length; i++) {
+    await prisma.remark.update({
+      where: { id: allRemarks[i].id },
+      data: { isEditable: false }
+    });
+  }
 
   // Format response to match frontend expectations
   const formattedRemark = {

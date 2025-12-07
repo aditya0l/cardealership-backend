@@ -67,6 +67,7 @@ model Enquiry {
   model               String?
   source              EnquirySource   @default(WALK_IN)
   variant             String?
+  fuelType            String?         @map("fuel_type") // Task 2: Vehicle details from quotation CSV
   dealerCode          String?         @map("dealer_code")
   location            String?
   dealershipId        String?         @map("dealership_id") // Multi-tenant dealership
@@ -75,6 +76,10 @@ model Enquiry {
   lastFollowUpDate DateTime? @map("last_follow_up_date")
   followUpCount    Int       @default(0) @map("follow_up_count")
   nextFollowUpDate DateTime? @map("next_follow_up_date")
+
+  // Task 2: Quotation import tracking
+  isImportedFromQuotation Boolean @default(false) @map("is_imported_from_quotation")
+  quotationImportedAt     DateTime? @map("quotation_imported_at")
 
   // Relations
   bookings      Booking[]
@@ -498,6 +503,7 @@ model Remark {
   cancellationReason String?   @map("cancellation_reason")
   cancelledAt        DateTime? @map("cancelled_at")
   cancelledBy        String?   @map("cancelled_by")
+  isEditable         Boolean   @default(true) @map("is_editable") // Task 4: Mark older remarks as non-editable
 
   // Separate fields for enquiries and bookings (no polymorphic relation)
   enquiryId String? @map("enquiry_id")
