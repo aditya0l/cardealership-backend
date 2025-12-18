@@ -5,6 +5,7 @@ services:
     env: node
     region: singapore
     plan: free
+    rootDir: /
     buildCommand: npm install && npx prisma generate && npm run build
     startCommand: node scripts/wait-for-db-and-deploy.js
     healthCheckPath: /api/health

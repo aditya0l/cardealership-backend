@@ -102,9 +102,16 @@ async function main() {
   // Check multiple possible locations for dist/server.js
   const possiblePaths = [
     path.join(projectRoot, 'dist', 'server.js'),           // Standard: /opt/render/project/dist/server.js
+    path.resolve(projectRoot, 'dist', 'server.js'),       // Absolute path version
     path.join(process.cwd(), 'dist', 'server.js'),         // Fallback to cwd
-    path.join(projectRoot, '..', 'dist', 'server.js'),     // If in subdirectory
+    path.resolve(process.cwd(), 'dist', 'server.js'),     // Absolute cwd version
   ];
+  
+  console.log('🔍 Checking for dist/server.js in these locations:');
+  possiblePaths.forEach(p => {
+    const exists = fs.existsSync(p);
+    console.log(`   ${exists ? '✅' : '❌'} ${p}`);
+  });
   
   let distServerPath = null;
   for (const possiblePath of possiblePaths) {
@@ -211,15 +218,25 @@ async function main() {
   // Step 6: Start application using absolute path
   console.log('\n🚀 Starting application...\n');
   console.log(`📁 Using server file: ${distServerPath}\n`);
+  console.log(`📁 Absolute path resolved: ${path.resolve(distServerPath)}\n`);
   
-  // Determine project root (parent of dist directory)
-  const projectRoot = path.dirname(path.dirname(distServerPath));
-  console.log(`📁 Project root: ${projectRoot}\n`);
+  // Ensure we're in project root
+  process.chdir(projectRoot);
+  console.log(`📁 Final working directory: ${process.cwd()}\n`);
   
-  // Use absolute path to start the server instead of npm start
-  // This ensures we use the correct path regardless of working directory
-  // Set cwd to project root so relative imports work correctly
-  execSync(`node "${distServerPath}"`, {
+  // Verify file exists one more time
+  if (!fs.existsSync(distServerPath)) {
+    console.error(`❌ File does not exist: ${distServerPath}`);
+    console.error(`   Absolute path: ${path.resolve(distServerPath)}`);
+    process.exit(1);
+  }
+  
+  // Use absolute path to start the server
+  // Convert to absolute path to avoid any relative path issues
+  const absoluteServerPath = path.resolve(distServerPath);
+  console.log(`🚀 Starting server with: node "${absoluteServerPath}"\n`);
+  
+  execSync(`node "${absoluteServerPath}"`, {
     stdio: 'inherit',
     env: process.env,
     cwd: projectRoot, // Set cwd to project root
