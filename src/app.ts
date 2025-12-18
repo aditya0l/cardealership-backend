@@ -82,6 +82,8 @@ app.use(cors({
       /^https:\/\/.*\.vercel\.app$/,
       // Netlify domains
       /^https:\/\/.*\.netlify\.app$/,
+      // Render domains (backend and frontend)
+      /^https:\/\/.*\.onrender\.com$/,
       // Add your deployed frontend URLs here after deployment
     ];
     

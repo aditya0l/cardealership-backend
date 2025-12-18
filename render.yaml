@@ -17,6 +17,11 @@ services:
         fromDatabase:
           name: dealership-db
           property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: dealership-redis
+          type: redis
+          property: connectionString
       - key: FIREBASE_PROJECT_ID
         sync: false
       - key: FIREBASE_PRIVATE_KEY
@@ -26,7 +31,7 @@ services:
       - key: FIREBASE_DATABASE_URL
         sync: false
 
-  # Redis Service (for bulk imports)
+  # Redis Service (for bulk imports and job queues)
   - type: redis
     name: dealership-redis
     region: singapore
