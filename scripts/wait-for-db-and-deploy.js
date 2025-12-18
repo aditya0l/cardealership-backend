@@ -70,50 +70,62 @@ async function runCommand(command, description) {
 }
 
 // Find project root by looking for package.json
-// But ensure we're not in a subdirectory like src/
+// Handle case where we might be in /opt/render/project/src
 function findProjectRoot(startPath = process.cwd()) {
   let currentPath = path.resolve(startPath);
   const root = path.parse(currentPath).root;
   
-  // First, try to find the actual project root (where package.json has "name" field)
-  while (currentPath !== root) {
-    const packageJsonPath = path.join(currentPath, 'package.json');
-    if (fs.existsSync(packageJsonPath)) {
-      try {
-        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-        // Check if this is the main package.json (has name field matching our project)
-        if (packageJson.name === 'car-dealership-backend' || 
-            (packageJson.name && !currentPath.includes('/src'))) {
-          return currentPath;
-        }
-      } catch (e) {
-        // If we can't parse, assume it's valid
-        return currentPath;
+  // If we're in a 'src' subdirectory, go up one level first
+  if (currentPath.endsWith('/src') || currentPath.endsWith('\\src')) {
+    const parentPath = path.dirname(currentPath);
+    const parentPackageJson = path.join(parentPath, 'package.json');
+    if (fs.existsSync(parentPackageJson)) {
+      console.log(`📁 Detected we're in src/, using parent directory: ${parentPath}`);
+      // Verify parent has dist/ or prisma/ to confirm it's the real root
+      const hasDist = fs.existsSync(path.join(parentPath, 'dist'));
+      const hasPrisma = fs.existsSync(path.join(parentPath, 'prisma'));
+      if (hasDist || hasPrisma) {
+        return parentPath;
       }
     }
-    currentPath = path.dirname(currentPath);
   }
   
-  // Fallback: go up from current directory until we find package.json
-  // but prefer paths that don't contain 'src'
-  currentPath = path.resolve(startPath);
+  // Normal search for package.json
   while (currentPath !== root) {
     const packageJsonPath = path.join(currentPath, 'package.json');
     if (fs.existsSync(packageJsonPath)) {
-      // If we're in src/, go up one more level
-      if (currentPath.includes('/src') && currentPath !== root) {
+      // Verify this is the main package.json by checking for key directories
+      const hasSrcDir = fs.existsSync(path.join(currentPath, 'src'));
+      const hasDistDir = fs.existsSync(path.join(currentPath, 'dist'));
+      const hasPrismaDir = fs.existsSync(path.join(currentPath, 'prisma'));
+      
+      // If we found package.json but it's in src/, go up one more level
+      if (currentPath.endsWith('/src') || currentPath.endsWith('\\src')) {
         const parentPath = path.dirname(currentPath);
         const parentPackageJson = path.join(parentPath, 'package.json');
         if (fs.existsSync(parentPackageJson)) {
           return parentPath;
         }
       }
+      
+      // If we have src/, dist/, or prisma/, this is likely the root
+      if (hasSrcDir || hasDistDir || hasPrismaDir) {
+        return currentPath;
+      }
+      
+      // Otherwise, go up one more level to check
+      const parentPath = path.dirname(currentPath);
+      const parentPackageJson = path.join(parentPath, 'package.json');
+      if (fs.existsSync(parentPackageJson)) {
+        return parentPath;
+      }
+      
       return currentPath;
     }
     currentPath = path.dirname(currentPath);
   }
   
-  // Final fallback
+  // Fallback to current working directory
   return process.cwd();
 }
 
