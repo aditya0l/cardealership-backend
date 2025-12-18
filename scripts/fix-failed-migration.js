@@ -29,13 +29,29 @@ async function fixFailedMigration() {
       )
     ]);
     
+    // Check if migrations table exists
+    const migrationsTableExists = await prisma.$queryRawUnsafe(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = '_prisma_migrations'
+      );
+    `);
+    
+    if (!migrationsTableExists[0]?.exists) {
+      console.log('ℹ️  Migrations table does not exist yet - this is a fresh database');
+      console.log('   Migrations will be applied from the beginning');
+      process.exit(0);
+    }
+    
     // Delete the failed migration records
     await prisma.$executeRawUnsafe(`
       DELETE FROM "_prisma_migrations" 
       WHERE migration_name IN (
         '20251011_add_employee_hierarchy_stock_and_models',
         '20251011060000_cleanup_failed_migration',
-        '20251014_multitenant_dealership_required'
+        '20251014_multitenant_dealership_required',
+        '20250102200000_add_fuel_type_to_enquiry'
       )
       AND finished_at IS NULL;
     `);

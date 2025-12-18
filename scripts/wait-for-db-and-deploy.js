@@ -320,7 +320,22 @@ async function main() {
     console.log('⚠️  Could not resolve migration (this is OK if migration doesn\'t exist or already resolved)');
   }
 
-  // Step 4: Run migrations (required) - matches Render's current command
+  // Step 4: Resolve failed migration if it exists
+  const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
+  try {
+    console.log(`\n🔧 Attempting to resolve failed migration: ${failedMigrationName}...`);
+    execSync(`npx prisma migrate resolve --applied ${failedMigrationName}`, {
+      stdio: 'inherit',
+      env: process.env,
+      timeout: 30000,
+    });
+    console.log('✅ Failed migration resolved');
+  } catch (error) {
+    // This is expected if migration doesn't exist or already resolved
+    console.log('⚠️  Could not resolve failed migration (this is OK if it doesn\'t exist or already resolved)');
+  }
+
+  // Step 5: Run migrations (required) - matches Render's current command
   console.log('\n📦 Running database migrations...');
   console.log(`📊 Using DATABASE_URL: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 60) + '...' : 'NOT SET'}\n`);
   const migrationsSuccess = await runCommand(
@@ -330,8 +345,34 @@ async function main() {
 
   if (!migrationsSuccess) {
     console.error('\n❌ Migration deployment failed');
-    console.error('   Please check database connection and migration status');
-    process.exit(1);
+    console.error('   Attempting to resolve failed migration and retry...');
+    
+    // Try to resolve the failed migration and retry
+    try {
+      console.log(`\n🔧 Resolving failed migration: ${failedMigrationName}...`);
+      execSync(`npx prisma migrate resolve --applied ${failedMigrationName}`, {
+        stdio: 'inherit',
+        env: process.env,
+        timeout: 30000,
+      });
+      console.log('✅ Failed migration resolved, retrying migrations...');
+      
+      // Retry migrations
+      const retrySuccess = await runCommand(
+        'npx prisma migrate deploy',
+        'Retrying database migrations'
+      );
+      
+      if (!retrySuccess) {
+        console.error('\n❌ Migration deployment failed after retry');
+        console.error('   Please check database connection and migration status');
+        process.exit(1);
+      }
+    } catch (resolveError) {
+      console.error('\n❌ Could not resolve failed migration');
+      console.error('   Please check database connection and migration status');
+      process.exit(1);
+    }
   }
 
   // Step 5: Verify build exists before starting
