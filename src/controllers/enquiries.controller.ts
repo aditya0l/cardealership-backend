@@ -174,13 +174,13 @@ export const createEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
   }
 
   let parsedNextFollowUpDate: Date;
-  parsedNextFollowUpDate = new Date(nextFollowUpDate);
-  if (isNaN(parsedNextFollowUpDate.getTime())) {
-    throw createError('Invalid next follow up date format', 400);
-  }
-  const nextFollowUpStart = new Date(parsedNextFollowUpDate);
-  nextFollowUpStart.setHours(0, 0, 0, 0);
-  if (nextFollowUpStart < today) {
+    parsedNextFollowUpDate = new Date(nextFollowUpDate);
+    if (isNaN(parsedNextFollowUpDate.getTime())) {
+      throw createError('Invalid next follow up date format', 400);
+    }
+    const nextFollowUpStart = new Date(parsedNextFollowUpDate);
+    nextFollowUpStart.setHours(0, 0, 0, 0);
+    if (nextFollowUpStart < today) {
     throw createError('Follow-up date cannot be in the past', 400);
   }
 
@@ -610,18 +610,18 @@ export const updateEnquiry = asyncHandler(async (req: AuthenticatedRequest, res:
     if (!nextFollowUpDate) {
       throw createError('Follow-up date is mandatory and cannot be removed', 400);
     }
-    const parsedNextFollowUp = new Date(nextFollowUpDate);
-    if (isNaN(parsedNextFollowUp.getTime())) {
-      throw createError('Invalid next follow up date format', 400);
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    parsedNextFollowUp.setHours(0, 0, 0, 0);
-    if (parsedNextFollowUp < today) {
+      const parsedNextFollowUp = new Date(nextFollowUpDate);
+      if (isNaN(parsedNextFollowUp.getTime())) {
+        throw createError('Invalid next follow up date format', 400);
+      }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      parsedNextFollowUp.setHours(0, 0, 0, 0);
+      if (parsedNextFollowUp < today) {
       throw createError('Follow-up date cannot be in the past', 400);
+      }
+      updateFields.nextFollowUpDate = parsedNextFollowUp;
     }
-    updateFields.nextFollowUpDate = parsedNextFollowUp;
-  }
   
   // Task 3: Ensure EDB is also set if not provided in update
   if (expectedBookingDate === undefined && !existingEnquiry.expectedBookingDate) {
