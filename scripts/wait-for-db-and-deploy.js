@@ -70,19 +70,50 @@ async function runCommand(command, description) {
 }
 
 // Find project root by looking for package.json
+// But ensure we're not in a subdirectory like src/
 function findProjectRoot(startPath = process.cwd()) {
   let currentPath = path.resolve(startPath);
   const root = path.parse(currentPath).root;
   
+  // First, try to find the actual project root (where package.json has "name" field)
   while (currentPath !== root) {
     const packageJsonPath = path.join(currentPath, 'package.json');
     if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+        // Check if this is the main package.json (has name field matching our project)
+        if (packageJson.name === 'car-dealership-backend' || 
+            (packageJson.name && !currentPath.includes('/src'))) {
+          return currentPath;
+        }
+      } catch (e) {
+        // If we can't parse, assume it's valid
+        return currentPath;
+      }
+    }
+    currentPath = path.dirname(currentPath);
+  }
+  
+  // Fallback: go up from current directory until we find package.json
+  // but prefer paths that don't contain 'src'
+  currentPath = path.resolve(startPath);
+  while (currentPath !== root) {
+    const packageJsonPath = path.join(currentPath, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      // If we're in src/, go up one more level
+      if (currentPath.includes('/src') && currentPath !== root) {
+        const parentPath = path.dirname(currentPath);
+        const parentPackageJson = path.join(parentPath, 'package.json');
+        if (fs.existsSync(parentPackageJson)) {
+          return parentPath;
+        }
+      }
       return currentPath;
     }
     currentPath = path.dirname(currentPath);
   }
   
-  // Fallback to current working directory
+  // Final fallback
   return process.cwd();
 }
 
@@ -128,7 +159,7 @@ async function main() {
     try {
       execSync('npm run build', {
         stdio: 'inherit',
-        env: process.env,
+        env: { ...process.env, NODE_OPTIONS: '--max-old-space-size=2048' },
         cwd: projectRoot,
       });
       console.log('✅ Build completed successfully');

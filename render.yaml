@@ -6,7 +6,7 @@ services:
     region: singapore
     plan: free
     rootDir: /
-    buildCommand: npm install && npx prisma generate && npm run build
+    buildCommand: NODE_OPTIONS=--max-old-space-size=2048 npm install && npx prisma generate && NODE_OPTIONS=--max-old-space-size=2048 npm run build
     startCommand: node scripts/wait-for-db-and-deploy.js
     healthCheckPath: /api/health
     envVars:
