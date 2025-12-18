@@ -320,7 +320,20 @@ async function main() {
     console.log('⚠️  Could not resolve migration (this is OK if migration doesn\'t exist or already resolved)');
   }
 
-  // Step 4: Resolve failed migration if it exists
+  // Step 4: Fix RBAC enum migration if needed (before running migrations)
+  console.log('\n🔧 Checking for RBAC enum migration issues...');
+  try {
+    execSync('node scripts/fix-rbac-enum-migration.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ RBAC enum migration check completed');
+  } catch (error) {
+    console.log('⚠️  RBAC enum fix skipped (this is OK if not needed)');
+  }
+  
+  // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
     console.log(`\n🔧 Attempting to resolve failed migration: ${failedMigrationName}...`);
@@ -335,7 +348,7 @@ async function main() {
     console.log('⚠️  Could not resolve failed migration (this is OK if it doesn\'t exist or already resolved)');
   }
 
-  // Step 5: Run migrations (required) - matches Render's current command
+  // Step 6: Run migrations (required) - matches Render's current command
   console.log('\n📦 Running database migrations...');
   console.log(`📊 Using DATABASE_URL: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 60) + '...' : 'NOT SET'}\n`);
   const migrationsSuccess = await runCommand(
@@ -347,15 +360,28 @@ async function main() {
     console.error('\n❌ Migration deployment failed');
     console.error('   Attempting to resolve failed migration and retry...');
     
-    // Try to resolve the failed migration and retry
+    // Try to fix RBAC enum migration and retry
     try {
-      console.log(`\n🔧 Resolving failed migration: ${failedMigrationName}...`);
-      execSync(`npx prisma migrate resolve --applied ${failedMigrationName}`, {
+      console.log(`\n🔧 Fixing RBAC enum migration and retrying...`);
+      execSync('node scripts/fix-rbac-enum-migration.js', {
         stdio: 'inherit',
-        env: process.env,
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
         timeout: 30000,
       });
-      console.log('✅ Failed migration resolved, retrying migrations...');
+      
+      // Try to resolve the failed migration
+      try {
+        execSync(`npx prisma migrate resolve --applied 20251002200510_update_rbac_roles`, {
+          stdio: 'inherit',
+          env: process.env,
+          timeout: 30000,
+        });
+        console.log('✅ RBAC migration resolved');
+      } catch (resolveError) {
+        console.log('⚠️  Could not resolve RBAC migration (might already be resolved)');
+      }
+      
+      console.log('✅ Enum fix completed, retrying migrations...');
       
       // Retry migrations
       const retrySuccess = await runCommand(
@@ -368,8 +394,8 @@ async function main() {
         console.error('   Please check database connection and migration status');
         process.exit(1);
       }
-    } catch (resolveError) {
-      console.error('\n❌ Could not resolve failed migration');
+    } catch (fixError) {
+      console.error('\n❌ Could not fix enum migration');
       console.error('   Please check database connection and migration status');
       process.exit(1);
     }
