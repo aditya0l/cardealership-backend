@@ -22,13 +22,33 @@ async function waitForDatabase() {
     throw new Error('DATABASE_URL not found in environment');
   }
 
-  console.log('📊 DATABASE_URL is set:', process.env.DATABASE_URL.substring(0, 50) + '...');
+  // Clean and validate DATABASE_URL
+  let databaseUrl = process.env.DATABASE_URL.trim();
+  
+  // Remove any trailing invalid characters that might cause parsing issues
+  if (databaseUrl.endsWith('postgresql:') || databaseUrl.endsWith('postgresql://')) {
+    console.warn('⚠️  DATABASE_URL has trailing "postgresql:" - removing it');
+    databaseUrl = databaseUrl.replace(/postgresql:?\/?\/?$/, '');
+    process.env.DATABASE_URL = databaseUrl;
+  }
+  
+  // Validate URL format
+  try {
+    const url = new URL(databaseUrl);
+    console.log('📊 DATABASE_URL is set:', databaseUrl.substring(0, 50) + '...');
+    console.log(`📊 Database name: ${url.pathname.substring(1)}`);
+    console.log(`📊 Host: ${url.hostname}`);
+  } catch (error) {
+    console.error('❌ Invalid DATABASE_URL format:', error.message);
+    console.error(`   Current value: ${databaseUrl.substring(0, 100)}...`);
+    throw new Error('Invalid DATABASE_URL format');
+  }
 
   const prisma = new PrismaClient({
     log: ['error', 'warn'],
     datasources: {
       db: {
-        url: process.env.DATABASE_URL,
+        url: databaseUrl, // Use cleaned URL
       },
     },
   });
