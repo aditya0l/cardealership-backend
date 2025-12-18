@@ -14,8 +14,23 @@ const MAX_RETRIES = 30;
 const RETRY_DELAY = 2000; // 2 seconds
 
 async function waitForDatabase() {
+  // Check if DATABASE_URL is set
+  if (!process.env.DATABASE_URL) {
+    console.error('❌ DATABASE_URL environment variable is not set!');
+    console.error('   Please set DATABASE_URL in Render Dashboard → Environment tab');
+    console.error('   Current environment variables:', Object.keys(process.env).filter(k => k.includes('DATABASE') || k.includes('DB')));
+    throw new Error('DATABASE_URL not found in environment');
+  }
+
+  console.log('📊 DATABASE_URL is set:', process.env.DATABASE_URL.substring(0, 50) + '...');
+
   const prisma = new PrismaClient({
     log: ['error', 'warn'],
+    datasources: {
+      db: {
+        url: process.env.DATABASE_URL,
+      },
+    },
   });
 
   console.log('⏳ Waiting for database to be ready...');
@@ -133,6 +148,23 @@ async function main() {
   console.log('🚀 Starting deployment with database connection retry...\n');
   console.log(`📁 Current working directory: ${process.cwd()}\n`);
   
+  // Check DATABASE_URL early
+  if (!process.env.DATABASE_URL) {
+    console.error('❌ ERROR: DATABASE_URL environment variable is not set!');
+    console.error('\n📋 To fix this:');
+    console.error('   1. Go to Render Dashboard → Your Web Service');
+    console.error('   2. Click "Environment" tab');
+    console.error('   3. Add environment variable:');
+    console.error('      Key: DATABASE_URL');
+    console.error('      Value: postgresql://dealership_db_9v47_user:...@dpg-d51qvqv6s9ss73et0o3g-a/dealership_db_9v47');
+    console.error('   4. Click "Save Changes"');
+    console.error('   5. Redeploy the service\n');
+    process.exit(1);
+  }
+  
+  console.log('✅ DATABASE_URL is set');
+  console.log(`📊 Database URL: ${process.env.DATABASE_URL.substring(0, 60)}...\n`);
+  
   // Find project root
   const projectRoot = findProjectRoot();
   console.log(`📁 Project root: ${projectRoot}\n`);
@@ -199,14 +231,18 @@ async function main() {
 
   // Step 1: Run migration fix (non-blocking) - matches Render's current command
   console.log('🔧 Running migration cleanup (if needed)...');
-  try {
-    execSync('node scripts/fix-failed-migration.js', {
-      stdio: 'inherit',
-      env: process.env,
-      timeout: 15000,
-    });
-  } catch (error) {
-    console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
+  if (!process.env.DATABASE_URL) {
+    console.log('⚠️  DATABASE_URL not set, skipping migration cleanup');
+  } else {
+    try {
+      execSync('node scripts/fix-failed-migration.js', {
+        stdio: 'inherit',
+        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+        timeout: 15000,
+      });
+    } catch (error) {
+      console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
+    }
   }
 
   // Step 2: Wait for database (with retries)
@@ -240,6 +276,7 @@ async function main() {
 
   // Step 4: Run migrations (required) - matches Render's current command
   console.log('\n📦 Running database migrations...');
+  console.log(`📊 Using DATABASE_URL: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 60) + '...' : 'NOT SET'}\n`);
   const migrationsSuccess = await runCommand(
     'npx prisma migrate deploy',
     'Running database migrations'
