@@ -69,28 +69,82 @@ async function runCommand(command, description) {
   }
 }
 
+// Find project root by looking for package.json
+function findProjectRoot(startPath = process.cwd()) {
+  let currentPath = path.resolve(startPath);
+  const root = path.parse(currentPath).root;
+  
+  while (currentPath !== root) {
+    const packageJsonPath = path.join(currentPath, 'package.json');
+    if (fs.existsSync(packageJsonPath)) {
+      return currentPath;
+    }
+    currentPath = path.dirname(currentPath);
+  }
+  
+  // Fallback to current working directory
+  return process.cwd();
+}
+
 async function main() {
   console.log('🚀 Starting deployment with database connection retry...\n');
+  console.log(`📁 Current working directory: ${process.cwd()}\n`);
+  
+  // Find project root
+  const projectRoot = findProjectRoot();
+  console.log(`📁 Project root: ${projectRoot}\n`);
+  
+  // Change to project root to ensure all commands run from correct directory
+  process.chdir(projectRoot);
+  console.log(`📁 Changed working directory to: ${process.cwd()}\n`);
 
   // Step 0: Verify build exists, rebuild if needed
-  const distServerPath = path.join(process.cwd(), 'dist', 'server.js');
+  // Check multiple possible locations for dist/server.js
+  const possiblePaths = [
+    path.join(projectRoot, 'dist', 'server.js'),           // Standard: /opt/render/project/dist/server.js
+    path.join(process.cwd(), 'dist', 'server.js'),         // Fallback to cwd
+    path.join(projectRoot, '..', 'dist', 'server.js'),     // If in subdirectory
+  ];
   
-  if (!fs.existsSync(distServerPath)) {
-    console.log('⚠️  dist/server.js not found. Building application...');
+  let distServerPath = null;
+  for (const possiblePath of possiblePaths) {
+    if (fs.existsSync(possiblePath)) {
+      distServerPath = possiblePath;
+      console.log(`✅ Found build at: ${distServerPath}`);
+      break;
+    }
+  }
+  
+  if (!distServerPath) {
+    console.log('⚠️  dist/server.js not found in any expected location. Building application...');
+    console.log('📦 Running TypeScript build...');
     try {
-      console.log('📦 Running TypeScript build...');
       execSync('npm run build', {
         stdio: 'inherit',
         env: process.env,
-        cwd: process.cwd(),
+        cwd: projectRoot,
       });
       console.log('✅ Build completed successfully');
+      
+      // Check again after build
+      for (const possiblePath of possiblePaths) {
+        if (fs.existsSync(possiblePath)) {
+          distServerPath = possiblePath;
+          console.log(`✅ Found build at: ${distServerPath}`);
+          break;
+        }
+      }
     } catch (error) {
       console.error('❌ Build failed:', error.message);
       process.exit(1);
     }
-  } else {
-    console.log('✅ Build artifacts found');
+  }
+  
+  if (!distServerPath) {
+    console.error('❌ dist/server.js still not found after build attempt');
+    console.error('   Checked paths:');
+    possiblePaths.forEach(p => console.error(`     - ${p}`));
+    process.exit(1);
   }
 
   // Step 1: Run migration fix (non-blocking) - matches Render's current command
@@ -154,13 +208,21 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 6: Start application
+  // Step 6: Start application using absolute path
   console.log('\n🚀 Starting application...\n');
   console.log(`📁 Using server file: ${distServerPath}\n`);
-  execSync('npm start', {
+  
+  // Determine project root (parent of dist directory)
+  const projectRoot = path.dirname(path.dirname(distServerPath));
+  console.log(`📁 Project root: ${projectRoot}\n`);
+  
+  // Use absolute path to start the server instead of npm start
+  // This ensures we use the correct path regardless of working directory
+  // Set cwd to project root so relative imports work correctly
+  execSync(`node "${distServerPath}"`, {
     stdio: 'inherit',
     env: process.env,
-    cwd: process.cwd(),
+    cwd: projectRoot, // Set cwd to project root
   });
 }
 
