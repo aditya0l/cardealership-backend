@@ -7,6 +7,8 @@
 
 const { execSync } = require('child_process');
 const { PrismaClient } = require('@prisma/client');
+const fs = require('fs');
+const path = require('path');
 
 const MAX_RETRIES = 30;
 const RETRY_DELAY = 2000; // 2 seconds
@@ -70,6 +72,27 @@ async function runCommand(command, description) {
 async function main() {
   console.log('🚀 Starting deployment with database connection retry...\n');
 
+  // Step 0: Verify build exists, rebuild if needed
+  const distServerPath = path.join(process.cwd(), 'dist', 'server.js');
+  
+  if (!fs.existsSync(distServerPath)) {
+    console.log('⚠️  dist/server.js not found. Building application...');
+    try {
+      console.log('📦 Running TypeScript build...');
+      execSync('npm run build', {
+        stdio: 'inherit',
+        env: process.env,
+        cwd: process.cwd(),
+      });
+      console.log('✅ Build completed successfully');
+    } catch (error) {
+      console.error('❌ Build failed:', error.message);
+      process.exit(1);
+    }
+  } else {
+    console.log('✅ Build artifacts found');
+  }
+
   // Step 1: Run migration fix (non-blocking) - matches Render's current command
   console.log('🔧 Running migration cleanup (if needed)...');
   try {
@@ -124,11 +147,20 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 5: Start application - matches Render's current command
+  // Step 5: Verify build exists before starting
+  if (!fs.existsSync(distServerPath)) {
+    console.error('❌ dist/server.js still not found after build attempt');
+    console.error('   Please check build logs for errors');
+    process.exit(1);
+  }
+
+  // Step 6: Start application
   console.log('\n🚀 Starting application...\n');
+  console.log(`📁 Using server file: ${distServerPath}\n`);
   execSync('npm start', {
     stdio: 'inherit',
     env: process.env,
+    cwd: process.cwd(),
   });
 }
 
