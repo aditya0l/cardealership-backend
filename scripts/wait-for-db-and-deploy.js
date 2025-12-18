@@ -162,8 +162,34 @@ async function main() {
     process.exit(1);
   }
   
-  console.log('✅ DATABASE_URL is set');
-  console.log(`📊 Database URL: ${process.env.DATABASE_URL.substring(0, 60)}...\n`);
+  // Validate and clean DATABASE_URL
+  let databaseUrl = process.env.DATABASE_URL.trim();
+  
+  // Remove any trailing "postgresql:" or other invalid characters
+  if (databaseUrl.endsWith('postgresql:') || databaseUrl.endsWith('postgresql://')) {
+    console.warn('⚠️  DATABASE_URL has trailing "postgresql:" - removing it');
+    databaseUrl = databaseUrl.replace(/postgresql:?\/?\/?$/, '');
+  }
+  
+  // Validate URL format
+  try {
+    const url = new URL(databaseUrl);
+    if (url.protocol !== 'postgresql:') {
+      console.error(`❌ Invalid DATABASE_URL protocol: ${url.protocol}. Expected postgresql:`);
+      process.exit(1);
+    }
+    console.log('✅ DATABASE_URL is set and valid');
+    console.log(`📊 Database URL: ${databaseUrl.substring(0, 60)}...`);
+    console.log(`📊 Database name: ${url.pathname.substring(1)}`);
+    console.log(`📊 Host: ${url.hostname}\n`);
+  } catch (error) {
+    console.error('❌ Invalid DATABASE_URL format:', error.message);
+    console.error(`   Current value: ${databaseUrl.substring(0, 100)}...`);
+    process.exit(1);
+  }
+  
+  // Update process.env with cleaned URL
+  process.env.DATABASE_URL = databaseUrl;
   
   // Find project root
   const projectRoot = findProjectRoot();
