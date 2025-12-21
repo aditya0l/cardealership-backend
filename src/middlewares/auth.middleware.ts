@@ -256,41 +256,27 @@ export const authenticate = async (
         // Ensure database connection is healthy
         await prisma.$queryRaw`SELECT 1`;
         
-        // Determine role from Firebase custom claims or token, default to ADMIN
-        let roleName = RoleName.ADMIN;
-        if (decodedToken?.role) {
-          roleName = decodedToken.role as RoleName;
-        } else if (decodedToken?.customClaims?.role) {
-          roleName = decodedToken.customClaims.role as RoleName;
-        }
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:258',message:'Determined role for auto-create',data:{roleName,email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-        
-        // Get role from database
-        const userRole = await prisma.role.findUnique({
-          where: { name: roleName }
-        }) || await prisma.role.findUnique({
+        // Get ADMIN role (auto-create always creates as ADMIN)
+        const adminRole = await prisma.role.findUnique({
           where: { name: RoleName.ADMIN }
         });
         
-        if (!userRole) {
-          console.error('❌ Role not found in database');
+        if (!adminRole) {
+          console.error('❌ ADMIN role not found in database');
           res.status(500).json({
             success: false,
-            message: 'System configuration error: Role not found'
+            message: 'System configuration error: ADMIN role not found'
           });
           return;
         }
         
-        // Create a UNIQUE dealership for each new user (ONE USER = ONE DEALERSHIP)
-        const dealershipCode = `${roleName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const userName = name || email?.split('@')[0] || 'New User';
+        // Create a UNIQUE dealership for each new admin (ONE ADMIN = ONE DEALERSHIP)
+        const dealershipCode = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const adminName = name || email?.split('@')[0] || 'New Admin';
         
         const defaultDealership = await prisma.dealership.create({
           data: {
-            name: `${userName}'s Dealership`,
+            name: `${adminName}'s Dealership`,
             code: dealershipCode,
             type: 'UNIVERSAL',
             email: email || `${uid}@firebase.user`,
@@ -306,17 +292,17 @@ export const authenticate = async (
             onboardingCompleted: false
           }
         });
-        console.log(`🏢 Created unique dealership for new user: ${defaultDealership.name}`);
+        console.log(`🏢 Created unique dealership for new admin: ${defaultDealership.name}`);
 
-        // Create user with determined role and assign to default dealership
+        // Create user with ADMIN role and assign to default dealership
         user = await prisma.user.create({
           data: {
             firebaseUid: uid,
             email: email || `${uid}@firebase.user`,
-            name: name || email?.split('@')[0] || 'New User',
-            roleId: userRole.id,
+            name: name || email?.split('@')[0] || 'New Admin',
+            roleId: adminRole.id,
             isActive: true,
-            employeeId: roleName === RoleName.ADMIN ? `ADM_${Date.now()}` : `USR_${Date.now()}`,
+            employeeId: `ADM_${Date.now()}`,
             dealershipId: defaultDealership.id // Assign to default dealership
           },
           include: {
@@ -329,7 +315,7 @@ export const authenticate = async (
         fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:305',message:'Auto-created user',data:{email:user.email,role:user.role.name,employeeId:user.employeeId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
         // #endregion
         
-        console.log(`✅ Auto-created user: ${user.email} with role ${user.role.name}`);
+        console.log(`✅ Auto-created ADMIN user: ${user.email}`);
         
       } catch (createError: any) {
         console.error('❌ Failed to auto-create user:', createError);
