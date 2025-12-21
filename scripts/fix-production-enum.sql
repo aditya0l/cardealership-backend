@@ -22,13 +22,13 @@ CREATE TYPE "EnquiryCategory_new" AS ENUM ('HOT', 'LOST', 'BOOKED');
 -- PARTS -> LOST (parts enquiries not part of sales pipeline)
 -- GENERAL -> HOT (general enquiries default to hot)
 UPDATE "enquiries" 
-SET "category" = CASE 
+SET "category" = (CASE 
   WHEN "category"::text = 'SALES' THEN 'HOT'
   WHEN "category"::text = 'SERVICE' THEN 'LOST'
   WHEN "category"::text = 'PARTS' THEN 'LOST'
   WHEN "category"::text = 'GENERAL' THEN 'HOT'
   ELSE 'HOT'
-END::"EnquiryCategory_new"::text
+END)::"EnquiryCategory_new"
 WHERE "category" IS NOT NULL;
 
 -- Step 4: Change column type to new enum

@@ -15,13 +15,13 @@ END $$;
 -- PARTS -> LOST (parts enquiries are not sales, mark as lost)
 -- GENERAL -> HOT (general enquiries default to hot)
 UPDATE "enquiries" 
-SET "category" = CASE 
-  WHEN "category"::text = 'SALES' THEN 'HOT'::text
-  WHEN "category"::text = 'SERVICE' THEN 'LOST'::text
-  WHEN "category"::text = 'PARTS' THEN 'LOST'::text
-  WHEN "category"::text = 'GENERAL' THEN 'HOT'::text
-  ELSE 'HOT'::text
-END::"EnquiryCategory_new"::text
+SET "category" = (CASE 
+  WHEN "category"::text = 'SALES' THEN 'HOT'
+  WHEN "category"::text = 'SERVICE' THEN 'LOST'
+  WHEN "category"::text = 'PARTS' THEN 'LOST'
+  WHEN "category"::text = 'GENERAL' THEN 'HOT'
+  ELSE 'HOT'
+END)::"EnquiryCategory_new"
 WHERE "category" IS NOT NULL;
 
 -- Step 3: Alter the column to use the new enum type
