@@ -280,14 +280,14 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     console.log('⚠️  DATABASE_URL not set, skipping migration cleanup');
   } else {
-    try {
-      execSync('node scripts/fix-failed-migration.js', {
-        stdio: 'inherit',
+  try {
+    execSync('node scripts/fix-failed-migration.js', {
+      stdio: 'inherit',
         env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-        timeout: 15000,
-      });
-    } catch (error) {
-      console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
+      timeout: 15000,
+    });
+  } catch (error) {
+    console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
     }
   }
 
@@ -333,6 +333,19 @@ async function main() {
     console.log('⚠️  RBAC enum fix skipped (this is OK if not needed)');
   }
   
+  // Step 4.5: Fix FCM columns if missing (before running migrations)
+  console.log('\n🔧 Checking for FCM notification columns...');
+  try {
+    execSync('node scripts/fix-fcm-columns.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ FCM columns check completed');
+  } catch (error) {
+    console.log('⚠️  FCM columns fix skipped (this is OK if not needed)');
+  }
+  
   // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
@@ -346,6 +359,19 @@ async function main() {
   } catch (error) {
     // This is expected if migration doesn't exist or already resolved
     console.log('⚠️  Could not resolve failed migration (this is OK if it doesn\'t exist or already resolved)');
+  }
+
+  // Step 5.5: Add FCM columns if missing (safety measure)
+  console.log('\n🔧 Checking for FCM notification columns...');
+  try {
+    execSync('ts-node scripts/add-fcm-columns.ts', {
+      stdio: 'inherit',
+      env: process.env,
+      timeout: 30000,
+    });
+    console.log('✅ FCM columns check completed');
+  } catch (error) {
+    console.log('⚠️  FCM columns check skipped (this is OK if columns already exist or migration will handle it)');
   }
 
   // Step 6: Run migrations (required) - matches Render's current command
@@ -396,7 +422,7 @@ async function main() {
       }
     } catch (fixError) {
       console.error('\n❌ Could not fix enum migration');
-      console.error('   Please check database connection and migration status');
+    console.error('   Please check database connection and migration status');
       process.exit(1);
     }
   }
