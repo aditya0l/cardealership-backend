@@ -155,6 +155,42 @@ async function fixMissingColumns() {
       console.warn('⚠️  Could not add bookings.next_follow_up_date:', error.message);
     }
 
+    // Fix enquiries.is_imported_from_quotation (if missing)
+    try {
+      const isImportedCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'is_imported_from_quotation'
+      `;
+      
+      if (isImportedCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "is_imported_from_quotation" BOOLEAN DEFAULT false NOT NULL`;
+        console.log('✅ Added enquiries.is_imported_from_quotation column');
+      } else {
+        console.log('⏭️  enquiries.is_imported_from_quotation column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.is_imported_from_quotation:', error.message);
+    }
+
+    // Fix enquiries.quotation_imported_at (if missing)
+    try {
+      const quotationImportedAtCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'quotation_imported_at'
+      `;
+      
+      if (quotationImportedAtCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "quotation_imported_at" TIMESTAMP(3)`;
+        console.log('✅ Added enquiries.quotation_imported_at column');
+      } else {
+        console.log('⏭️  enquiries.quotation_imported_at column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.quotation_imported_at:', error.message);
+    }
+
     console.log('✅ Missing columns check complete!');
     
   } catch (error) {
