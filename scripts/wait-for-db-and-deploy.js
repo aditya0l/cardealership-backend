@@ -24,14 +24,14 @@ async function waitForDatabase() {
 
   // Clean and validate DATABASE_URL
   let databaseUrl = process.env.DATABASE_URL.trim();
-  
+
   // Remove any trailing invalid characters that might cause parsing issues
   if (databaseUrl.endsWith('postgresql:') || databaseUrl.endsWith('postgresql://')) {
     console.warn('⚠️  DATABASE_URL has trailing "postgresql:" - removing it');
     databaseUrl = databaseUrl.replace(/postgresql:?\/?\/?$/, '');
     process.env.DATABASE_URL = databaseUrl;
   }
-  
+
   // Validate URL format
   try {
     const url = new URL(databaseUrl);
@@ -109,7 +109,7 @@ async function runCommand(command, description) {
 function findProjectRoot(startPath = process.cwd()) {
   let currentPath = path.resolve(startPath);
   const root = path.parse(currentPath).root;
-  
+
   // If we're in a 'src' subdirectory, go up one level first
   if (currentPath.endsWith('/src') || currentPath.endsWith('\\src')) {
     const parentPath = path.dirname(currentPath);
@@ -124,7 +124,7 @@ function findProjectRoot(startPath = process.cwd()) {
       }
     }
   }
-  
+
   // Normal search for package.json
   while (currentPath !== root) {
     const packageJsonPath = path.join(currentPath, 'package.json');
@@ -133,7 +133,7 @@ function findProjectRoot(startPath = process.cwd()) {
       const hasSrcDir = fs.existsSync(path.join(currentPath, 'src'));
       const hasDistDir = fs.existsSync(path.join(currentPath, 'dist'));
       const hasPrismaDir = fs.existsSync(path.join(currentPath, 'prisma'));
-      
+
       // If we found package.json but it's in src/, go up one more level
       if (currentPath.endsWith('/src') || currentPath.endsWith('\\src')) {
         const parentPath = path.dirname(currentPath);
@@ -142,24 +142,24 @@ function findProjectRoot(startPath = process.cwd()) {
           return parentPath;
         }
       }
-      
+
       // If we have src/, dist/, or prisma/, this is likely the root
       if (hasSrcDir || hasDistDir || hasPrismaDir) {
         return currentPath;
       }
-      
+
       // Otherwise, go up one more level to check
       const parentPath = path.dirname(currentPath);
       const parentPackageJson = path.join(parentPath, 'package.json');
       if (fs.existsSync(parentPackageJson)) {
         return parentPath;
       }
-      
+
       return currentPath;
     }
     currentPath = path.dirname(currentPath);
   }
-  
+
   // Fallback to current working directory
   return process.cwd();
 }
@@ -167,7 +167,7 @@ function findProjectRoot(startPath = process.cwd()) {
 async function main() {
   console.log('🚀 Starting deployment with database connection retry...\n');
   console.log(`📁 Current working directory: ${process.cwd()}\n`);
-  
+
   // Check DATABASE_URL early
   if (!process.env.DATABASE_URL) {
     console.error('❌ ERROR: DATABASE_URL environment variable is not set!');
@@ -181,16 +181,16 @@ async function main() {
     console.error('   5. Redeploy the service\n');
     process.exit(1);
   }
-  
+
   // Validate and clean DATABASE_URL
   let databaseUrl = process.env.DATABASE_URL.trim();
-  
+
   // Remove any trailing "postgresql:" or other invalid characters
   if (databaseUrl.endsWith('postgresql:') || databaseUrl.endsWith('postgresql://')) {
     console.warn('⚠️  DATABASE_URL has trailing "postgresql:" - removing it');
     databaseUrl = databaseUrl.replace(/postgresql:?\/?\/?$/, '');
   }
-  
+
   // Validate URL format
   try {
     const url = new URL(databaseUrl);
@@ -207,14 +207,14 @@ async function main() {
     console.error(`   Current value: ${databaseUrl.substring(0, 100)}...`);
     process.exit(1);
   }
-  
+
   // Update process.env with cleaned URL
   process.env.DATABASE_URL = databaseUrl;
-  
+
   // Find project root
   const projectRoot = findProjectRoot();
   console.log(`📁 Project root: ${projectRoot}\n`);
-  
+
   // Change to project root to ensure all commands run from correct directory
   process.chdir(projectRoot);
   console.log(`📁 Changed working directory to: ${process.cwd()}\n`);
@@ -227,13 +227,13 @@ async function main() {
     path.join(process.cwd(), 'dist', 'server.js'),         // Fallback to cwd
     path.resolve(process.cwd(), 'dist', 'server.js'),     // Absolute cwd version
   ];
-  
+
   console.log('🔍 Checking for dist/server.js in these locations:');
   possiblePaths.forEach(p => {
     const exists = fs.existsSync(p);
     console.log(`   ${exists ? '✅' : '❌'} ${p}`);
   });
-  
+
   let distServerPath = null;
   for (const possiblePath of possiblePaths) {
     if (fs.existsSync(possiblePath)) {
@@ -242,7 +242,7 @@ async function main() {
       break;
     }
   }
-  
+
   if (!distServerPath) {
     console.log('⚠️  dist/server.js not found in any expected location. Building application...');
     console.log('📦 Running TypeScript build...');
@@ -253,7 +253,7 @@ async function main() {
         cwd: projectRoot,
       });
       console.log('✅ Build completed successfully');
-      
+
       // Check again after build
       for (const possiblePath of possiblePaths) {
         if (fs.existsSync(possiblePath)) {
@@ -267,7 +267,7 @@ async function main() {
       process.exit(1);
     }
   }
-  
+
   if (!distServerPath) {
     console.error('❌ dist/server.js still not found after build attempt');
     console.error('   Checked paths:');
@@ -280,14 +280,14 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     console.log('⚠️  DATABASE_URL not set, skipping migration cleanup');
   } else {
-  try {
-    execSync('node scripts/fix-failed-migration.js', {
-      stdio: 'inherit',
+    try {
+      execSync('node scripts/fix-failed-migration.js', {
+        stdio: 'inherit',
         env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-      timeout: 15000,
-    });
-  } catch (error) {
-    console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
+        timeout: 15000,
+      });
+    } catch (error) {
+      console.log('⚠️  Migration cleanup skipped (database may not be ready yet)');
     }
   }
 
@@ -332,7 +332,7 @@ async function main() {
   } catch (error) {
     console.log('⚠️  RBAC enum fix skipped (this is OK if not needed)');
   }
-  
+
   // Step 4.5: Fix missing columns (FCM, fuel_type, chassis_number, etc.)
   console.log('\n🔧 Checking for missing database columns...');
   try {
@@ -345,7 +345,7 @@ async function main() {
   } catch (error) {
     console.log('⚠️  FCM columns fix skipped (this is OK if not needed)');
   }
-  
+
   try {
     execSync('node scripts/fix-missing-columns.js', {
       stdio: 'inherit',
@@ -356,7 +356,7 @@ async function main() {
   } catch (error) {
     console.log('⚠️  Missing columns fix skipped (this is OK if not needed)');
   }
-  
+
   // Step 4.7: Fix notification_logs table if missing
   console.log('\n🔧 Checking for notification_logs table...');
   try {
@@ -369,7 +369,7 @@ async function main() {
   } catch (error) {
     console.log('⚠️  Notification logs table fix skipped (this is OK if not needed)');
   }
-  
+
   // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
@@ -398,6 +398,21 @@ async function main() {
     console.log('⚠️  FCM columns check skipped (this is OK if columns already exist or migration will handle it)');
   }
 
+  // Step 5.7: Resolve failed enum migration if it exists
+  const enumMigrationName = '20251221_fix_enquiry_category_enum';
+  try {
+    console.log(`\n🔧 Attempting to resolve failed enum migration: ${enumMigrationName}...`);
+    execSync(`npx prisma migrate resolve --rolled-back ${enumMigrationName}`, {
+      stdio: 'inherit',
+      env: process.env,
+      timeout: 30000,
+    });
+    console.log('✅ Failed enum migration resolved');
+  } catch (error) {
+    // This is expected if migration doesn't exist or already resolved
+    console.log('⚠️  Could not resolve enum migration (this is OK if it doesn\\'t exist or not failed)');
+  }
+
   // Step 6: Run migrations (required) - matches Render's current command
   console.log('\n📦 Running database migrations...');
   console.log(`📊 Using DATABASE_URL: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 60) + '...' : 'NOT SET'}\n`);
@@ -409,7 +424,7 @@ async function main() {
   if (!migrationsSuccess) {
     console.error('\n❌ Migration deployment failed');
     console.error('   Attempting to resolve failed migration and retry...');
-    
+
     // Try to fix RBAC enum migration and retry
     try {
       console.log(`\n🔧 Fixing RBAC enum migration and retrying...`);
@@ -418,7 +433,7 @@ async function main() {
         env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
         timeout: 30000,
       });
-      
+
       // Try to resolve the failed migration
       try {
         execSync(`npx prisma migrate resolve --applied 20251002200510_update_rbac_roles`, {
@@ -430,15 +445,15 @@ async function main() {
       } catch (resolveError) {
         console.log('⚠️  Could not resolve RBAC migration (might already be resolved)');
       }
-      
+
       console.log('✅ Enum fix completed, retrying migrations...');
-      
+
       // Retry migrations
       const retrySuccess = await runCommand(
         'npx prisma migrate deploy',
         'Retrying database migrations'
       );
-      
+
       if (!retrySuccess) {
         console.error('\n❌ Migration deployment failed after retry');
         console.error('   Please check database connection and migration status');
@@ -446,7 +461,7 @@ async function main() {
       }
     } catch (fixError) {
       console.error('\n❌ Could not fix enum migration');
-    console.error('   Please check database connection and migration status');
+      console.error('   Please check database connection and migration status');
       process.exit(1);
     }
   }
@@ -462,23 +477,23 @@ async function main() {
   console.log('\n🚀 Starting application...\n');
   console.log(`📁 Using server file: ${distServerPath}\n`);
   console.log(`📁 Absolute path resolved: ${path.resolve(distServerPath)}\n`);
-  
+
   // Ensure we're in project root
   process.chdir(projectRoot);
   console.log(`📁 Final working directory: ${process.cwd()}\n`);
-  
+
   // Verify file exists one more time
   if (!fs.existsSync(distServerPath)) {
     console.error(`❌ File does not exist: ${distServerPath}`);
     console.error(`   Absolute path: ${path.resolve(distServerPath)}`);
     process.exit(1);
   }
-  
+
   // Use absolute path to start the server
   // Convert to absolute path to avoid any relative path issues
   const absoluteServerPath = path.resolve(distServerPath);
   console.log(`🚀 Starting server with: node "${absoluteServerPath}"\n`);
-  
+
   execSync(`node "${absoluteServerPath}"`, {
     stdio: 'inherit',
     env: process.env,
