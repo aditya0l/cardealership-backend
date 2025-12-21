@@ -190,13 +190,53 @@ export const authenticate = async (
     const { uid } = decodedToken;
     let { email, name } = decodedToken;
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:190',message:'Before user query - checking schema',data:{uid,hasEmail:!!email,hasName:!!name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    // Check if fcm_token column exists in database (hypothesis testing)
+    let fcmColumnExists = false;
+    try {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:197',message:'Checking if fcm_token column exists',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      const columnCheck = await prisma.$queryRaw<Array<{column_name: string}>>`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'users' AND column_name = 'fcm_token'
+      `;
+      fcmColumnExists = columnCheck.length > 0;
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:203',message:'Column check result',data:{fcmColumnExists,columnCheckLength:columnCheck.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    } catch (schemaCheckError: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:207',message:'Schema check error',data:{error:schemaCheckError?.message,code:schemaCheckError?.code},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      console.warn('Could not check schema:', schemaCheckError);
+    }
+
     // Get user from database
-    let user = await prisma.user.findUnique({
-      where: { firebaseUid: uid },
-      include: {
-        role: true
-      }
-    });
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:214',message:'About to query user',data:{fcmColumnExists},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { firebaseUid: uid },
+        include: {
+          role: true
+        }
+      });
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:225',message:'User query succeeded',data:{userFound:!!user,userEmail:user?.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+    } catch (queryError: any) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:229',message:'User query failed',data:{error:queryError?.message,code:queryError?.code,meta:queryError?.meta},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      throw queryError;
+    }
 
     // AUTO-CREATE: Create user with ADMIN role if they don't exist
     if (!user) {
