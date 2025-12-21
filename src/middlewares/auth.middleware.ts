@@ -190,6 +190,10 @@ export const authenticate = async (
       }
     }
     
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:192',message:'Token decoded - checking role in token',data:{tokenRole:decodedToken?.role,tokenCustomClaims:decodedToken?.customClaims,hasRole:!!decodedToken?.role,hasCustomClaims:!!decodedToken?.customClaims},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+    
     const { uid } = decodedToken;
     let { email, name } = decodedToken;
 
@@ -232,7 +236,7 @@ export const authenticate = async (
         }
       });
       // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:225',message:'User query succeeded',data:{userFound:!!user,userEmail:user?.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:225',message:'User query succeeded',data:{userFound:!!user,userEmail:user?.email,dbRole:user?.role?.name,dbRoleId:user?.role?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
       // #endregion
     } catch (queryError: any) {
       // #region agent log
@@ -244,32 +248,49 @@ export const authenticate = async (
     // AUTO-CREATE: Create user with ADMIN role if they don't exist
     if (!user) {
       console.log(`🆕 Auto-creating new user: ${email || uid}`);
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:245',message:'Auto-creating user - checking role',data:{email,uid,decodedTokenRole:decodedToken?.role,decodedTokenCustomClaims:decodedToken?.customClaims},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       try {
         // Ensure database connection is healthy
         await prisma.$queryRaw`SELECT 1`;
         
-        // Get ADMIN role
-        const adminRole = await prisma.role.findUnique({
+        // Determine role from Firebase custom claims or token, default to ADMIN
+        let roleName = RoleName.ADMIN;
+        if (decodedToken?.role) {
+          roleName = decodedToken.role as RoleName;
+        } else if (decodedToken?.customClaims?.role) {
+          roleName = decodedToken.customClaims.role as RoleName;
+        }
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:258',message:'Determined role for auto-create',data:{roleName,email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        // Get role from database
+        const userRole = await prisma.role.findUnique({
+          where: { name: roleName }
+        }) || await prisma.role.findUnique({
           where: { name: RoleName.ADMIN }
         });
         
-        if (!adminRole) {
-          console.error('❌ ADMIN role not found in database');
+        if (!userRole) {
+          console.error('❌ Role not found in database');
           res.status(500).json({
             success: false,
-            message: 'System configuration error: ADMIN role not found'
+            message: 'System configuration error: Role not found'
           });
           return;
         }
         
-        // Create a UNIQUE dealership for each new admin (ONE ADMIN = ONE DEALERSHIP)
-        const dealershipCode = `ADMIN_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const adminName = name || email?.split('@')[0] || 'New Admin';
+        // Create a UNIQUE dealership for each new user (ONE USER = ONE DEALERSHIP)
+        const dealershipCode = `${roleName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const userName = name || email?.split('@')[0] || 'New User';
         
         const defaultDealership = await prisma.dealership.create({
           data: {
-            name: `${adminName}'s Dealership`,
+            name: `${userName}'s Dealership`,
             code: dealershipCode,
             type: 'UNIVERSAL',
             email: email || `${uid}@firebase.user`,
@@ -285,17 +306,17 @@ export const authenticate = async (
             onboardingCompleted: false
           }
         });
-        console.log(`🏢 Created unique dealership for new admin: ${defaultDealership.name}`);
+        console.log(`🏢 Created unique dealership for new user: ${defaultDealership.name}`);
 
-        // Create user with ADMIN role and assign to default dealership
+        // Create user with determined role and assign to default dealership
         user = await prisma.user.create({
           data: {
             firebaseUid: uid,
             email: email || `${uid}@firebase.user`,
-            name: name || email?.split('@')[0] || 'New Admin',
-            roleId: adminRole.id,
+            name: name || email?.split('@')[0] || 'New User',
+            roleId: userRole.id,
             isActive: true,
-            employeeId: `ADM_${Date.now()}`,
+            employeeId: roleName === RoleName.ADMIN ? `ADM_${Date.now()}` : `USR_${Date.now()}`,
             dealershipId: defaultDealership.id // Assign to default dealership
           },
           include: {
@@ -304,7 +325,11 @@ export const authenticate = async (
           }
         });
         
-        console.log(`✅ Auto-created ADMIN user: ${user.email}`);
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:305',message:'Auto-created user',data:{email:user.email,role:user.role.name,employeeId:user.employeeId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
+        
+        console.log(`✅ Auto-created user: ${user.email} with role ${user.role.name}`);
         
       } catch (createError: any) {
         console.error('❌ Failed to auto-create user:', createError);
@@ -495,6 +520,10 @@ export const authenticate = async (
 
     const dealershipContext = await resolveDealershipContext(user.dealershipId);
 
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:517',message:'Setting authenticated user role',data:{dbRole:user.role.name,dbRoleId:user.role.id,tokenRole:decodedToken?.role,tokenCustomClaimsRole:decodedToken?.customClaims?.role,email:user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
+
     (req as AuthenticatedRequest).user = {
       firebaseUid: user.firebaseUid,
       email: user.email,
@@ -508,6 +537,10 @@ export const authenticate = async (
       dealershipCode: dealershipContext.dealershipCode,
       customClaims: decodedToken.customClaims || {}
     };
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/bb3037a1-a776-4a54-aa78-cb4dc8c68919',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth.middleware.ts:533',message:'Authenticated user set',data:{finalRole:user.role.name,email:user.email},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     next();
   } catch (error: any) {

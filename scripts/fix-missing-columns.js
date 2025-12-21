@@ -65,6 +65,60 @@ async function fixMissingColumns() {
       console.warn('⚠️  Could not add bookings.allocation_order_number:', error.message);
     }
 
+    // Fix enquiries.next_follow_up_date
+    try {
+      const nextFollowUpCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'next_follow_up_date'
+      `;
+      
+      if (nextFollowUpCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "next_follow_up_date" TIMESTAMP(3)`;
+        console.log('✅ Added enquiries.next_follow_up_date column');
+      } else {
+        console.log('⏭️  enquiries.next_follow_up_date column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.next_follow_up_date:', error.message);
+    }
+
+    // Fix enquiries.last_follow_up_date (if missing)
+    try {
+      const lastFollowUpCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'last_follow_up_date'
+      `;
+      
+      if (lastFollowUpCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "last_follow_up_date" TIMESTAMP(3)`;
+        console.log('✅ Added enquiries.last_follow_up_date column');
+      } else {
+        console.log('⏭️  enquiries.last_follow_up_date column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.last_follow_up_date:', error.message);
+    }
+
+    // Fix enquiries.follow_up_count (if missing)
+    try {
+      const followUpCountCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'follow_up_count'
+      `;
+      
+      if (followUpCountCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "follow_up_count" INTEGER DEFAULT 0 NOT NULL`;
+        console.log('✅ Added enquiries.follow_up_count column');
+      } else {
+        console.log('⏭️  enquiries.follow_up_count column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.follow_up_count:', error.message);
+    }
+
     console.log('✅ Missing columns check complete!');
     
   } catch (error) {
