@@ -410,7 +410,7 @@ async function main() {
     console.log('✅ Failed enum migration resolved');
   } catch (error) {
     // This is expected if migration doesn't exist or already resolved
-    console.log('⚠️  Could not resolve enum migration (this is OK if it doesn\\'t exist or not failed)');
+    console.log('⚠️  Could not resolve enum migration (this is OK if it doesn\'t exist or not failed)');
   }
 
   // Step 6: Run migrations (required) - matches Render's current command
