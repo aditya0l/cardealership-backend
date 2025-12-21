@@ -357,6 +357,19 @@ async function main() {
     console.log('⚠️  Missing columns fix skipped (this is OK if not needed)');
   }
   
+  // Step 4.7: Fix notification_logs table if missing
+  console.log('\n🔧 Checking for notification_logs table...');
+  try {
+    execSync('node scripts/fix-notification-logs-table.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ Notification logs table check completed');
+  } catch (error) {
+    console.log('⚠️  Notification logs table fix skipped (this is OK if not needed)');
+  }
+  
   // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {

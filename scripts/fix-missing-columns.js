@@ -119,6 +119,42 @@ async function fixMissingColumns() {
       console.warn('⚠️  Could not add enquiries.follow_up_count:', error.message);
     }
 
+    // Fix enquiries.location (if missing)
+    try {
+      const locationCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'enquiries' AND column_name = 'location'
+      `;
+      
+      if (locationCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "enquiries" ADD COLUMN IF NOT EXISTS "location" TEXT`;
+        console.log('✅ Added enquiries.location column');
+      } else {
+        console.log('⏭️  enquiries.location column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add enquiries.location:', error.message);
+    }
+
+    // Fix bookings.next_follow_up_date (if missing)
+    try {
+      const bookingNextFollowUpCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'bookings' AND column_name = 'next_follow_up_date'
+      `;
+      
+      if (bookingNextFollowUpCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "next_follow_up_date" TIMESTAMP(3)`;
+        console.log('✅ Added bookings.next_follow_up_date column');
+      } else {
+        console.log('⏭️  bookings.next_follow_up_date column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add bookings.next_follow_up_date:', error.message);
+    }
+
     console.log('✅ Missing columns check complete!');
     
   } catch (error) {
