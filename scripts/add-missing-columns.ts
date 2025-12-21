@@ -185,6 +185,26 @@ async function addMissingColumns() {
       console.warn('⚠️  Could not add bookings.allocation_order_number:', error.message);
     }
 
+    // Check and add enquiries.fuel_type column
+    try {
+      await prisma.$executeRawUnsafe(`
+        DO $$ 
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_name = 'enquiries' AND column_name = 'fuel_type'
+          ) THEN
+            ALTER TABLE enquiries ADD COLUMN fuel_type TEXT;
+            RAISE NOTICE '✅ Added enquiries.fuel_type column';
+          ELSE
+            RAISE NOTICE '⏭️  enquiries.fuel_type column already exists';
+          END IF;
+        END $$;
+      `);
+    } catch (error: any) {
+      console.warn('⚠️  Could not add enquiries.fuel_type:', error.message);
+    }
+
     console.log('✅ Missing columns check complete!');
     console.log('💡 Tip: If columns were added, restart your backend server.');
 

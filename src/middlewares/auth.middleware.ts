@@ -37,32 +37,35 @@ export const resolveDealershipContext = async (
   let legacyDealershipId: string | null = null;
 
   try {
-    const rows = await prisma.$queryRaw<{ uuid: string | null; code: string | null }[]>(
-      Prisma.sql`SELECT "uuid", "code" FROM "dealerships" WHERE "id" = ${dealershipId} LIMIT 1`
+    // Dealership model doesn't have a uuid column - only id and code
+    // Use id as both uuid and legacyId since they're the same
+    const rows = await prisma.$queryRaw<{ id: string | null; code: string | null }[]>(
+      Prisma.sql`SELECT "id", "code" FROM "dealerships" WHERE "id" = ${dealershipId} LIMIT 1`
     );
 
     if (rows && rows.length > 0) {
-      dealershipUuid = rows[0]?.uuid ?? null;
+      dealershipUuid = rows[0]?.id ?? null;
       dealershipCode = rows[0]?.code ?? null;
-      legacyDealershipId = dealershipId;
+      legacyDealershipId = rows[0]?.id ?? dealershipId;
     }
   } catch (error) {
-    console.warn('Unable to resolve dealership UUID via legacy ID lookup. Falling back to additional strategies.', error);
+    console.warn('Unable to resolve dealership via ID lookup. Falling back to provided identifier.', error);
   }
 
+  // If dealershipId is a UUID format, try to find by id (since there's no separate uuid column)
   if ((!dealershipUuid || !legacyDealershipId) && dealershipId && validateUUID(dealershipId)) {
     try {
-      const rows = await prisma.$queryRaw<{ uuid: string | null; code: string | null; id: string | null }[]>(
-        Prisma.sql`SELECT "uuid", "code", "id" FROM "dealerships" WHERE "uuid" = ${dealershipId} LIMIT 1`
+      const rows = await prisma.$queryRaw<{ id: string | null; code: string | null }[]>(
+        Prisma.sql`SELECT "id", "code" FROM "dealerships" WHERE "id" = ${dealershipId} LIMIT 1`
       );
 
       if (rows && rows.length > 0) {
-        dealershipUuid = rows[0]?.uuid ?? dealershipId;
+        dealershipUuid = rows[0]?.id ?? dealershipId;
         dealershipCode = rows[0]?.code ?? dealershipCode ?? null;
         legacyDealershipId = rows[0]?.id ?? legacyDealershipId;
       }
     } catch (error) {
-      console.warn('Unable to resolve dealership UUID via UUID lookup. Falling back to provided identifier.', error);
+      console.warn('Unable to resolve dealership via UUID lookup. Falling back to provided identifier.', error);
     }
   }
 

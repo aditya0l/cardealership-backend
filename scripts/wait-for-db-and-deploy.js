@@ -333,8 +333,8 @@ async function main() {
     console.log('⚠️  RBAC enum fix skipped (this is OK if not needed)');
   }
   
-  // Step 4.5: Fix FCM columns if missing (before running migrations)
-  console.log('\n🔧 Checking for FCM notification columns...');
+  // Step 4.5: Fix missing columns (FCM, fuel_type, chassis_number, etc.)
+  console.log('\n🔧 Checking for missing database columns...');
   try {
     execSync('node scripts/fix-fcm-columns.js', {
       stdio: 'inherit',
@@ -344,6 +344,17 @@ async function main() {
     console.log('✅ FCM columns check completed');
   } catch (error) {
     console.log('⚠️  FCM columns fix skipped (this is OK if not needed)');
+  }
+  
+  try {
+    execSync('node scripts/fix-missing-columns.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ Missing columns check completed');
+  } catch (error) {
+    console.log('⚠️  Missing columns fix skipped (this is OK if not needed)');
   }
   
   // Step 5: Resolve failed migration if it exists
