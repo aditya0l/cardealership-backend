@@ -45,7 +45,13 @@ BEGIN
   SELECT string_agg(enumlabel::text, ', ' ORDER BY enumsortorder)
   INTO enum_values
   FROM pg_enum
-  WHERE enumtypid = 'EnquiryCategory'::regtype;
+  WHERE enumtypid = (
+    SELECT oid 
+    FROM pg_type 
+    WHERE typname = 'EnquiryCategory'
+  );
   
-  RAISE NOTICE 'EnquiryCategory enum values: %', enum_values;
+  IF enum_values IS NOT NULL THEN
+    RAISE NOTICE 'EnquiryCategory enum values: %', enum_values;
+  END IF;
 END $$;
