@@ -223,9 +223,32 @@ function findProjectRoot(startPath = process.cwd()) {
   return process.cwd();
 }
 
+// Overall deployment timeout (5 minutes)
+const DEPLOYMENT_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+function logWithTimestamp(message) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] ${message}`);
+}
+
 async function main() {
-  console.log('🚀 Starting deployment with database connection retry...\n');
+  const deploymentStartTime = Date.now();
+  logWithTimestamp('🚀 Starting deployment with database connection retry...');
   console.log(`📁 Current working directory: ${process.cwd()}\n`);
+  
+  // Set overall timeout for deployment
+  const deploymentTimeout = setTimeout(() => {
+    const elapsed = ((Date.now() - deploymentStartTime) / 1000).toFixed(0);
+    console.error(`\n❌ Deployment timeout after ${elapsed} seconds (${DEPLOYMENT_TIMEOUT / 1000 / 60} minutes)`);
+    console.error('   Deployment exceeded maximum time limit');
+    console.error('   Please check logs for hanging operations');
+    process.exit(1);
+  }, DEPLOYMENT_TIMEOUT);
+  
+  // Clear timeout when deployment completes successfully
+  const clearDeploymentTimeout = () => {
+    clearTimeout(deploymentTimeout);
+  };
 
   // Check DATABASE_URL early
   if (!process.env.DATABASE_URL) {
@@ -335,7 +358,7 @@ async function main() {
   }
 
   // Step 1: Run migration fix (non-blocking) - matches Render's current command
-  console.log('🔧 Running migration cleanup (if needed)...');
+  logWithTimestamp('🔧 Step 1: Running migration cleanup (if needed)...');
   if (!process.env.DATABASE_URL) {
     console.log('⚠️  DATABASE_URL not set, skipping migration cleanup');
   } else {
@@ -351,7 +374,7 @@ async function main() {
   }
 
   // Step 2: Wait for database (with retries)
-  console.log('\n⏳ Waiting for database connection...');
+  logWithTimestamp('\n⏳ Step 2: Waiting for database connection...');
   const dbReady = await waitForDatabase();
 
   if (!dbReady) {
@@ -365,9 +388,10 @@ async function main() {
   }
 
   // Step 3: Try to resolve any rolled-back migrations (non-blocking) - matches Render's current command
+  logWithTimestamp('\n🔧 Step 3: Checking RBAC migration status...');
   const migrationName = '20251002200510_update_rbac_roles';
   try {
-    console.log(`\n🔧 Checking status of migration: ${migrationName}...`);
+    console.log(`   Checking migration: ${migrationName}...`);
     const status = await checkMigrationStatus(migrationName);
     console.log(`📊 Migration status: ${status}`);
 
@@ -394,7 +418,7 @@ async function main() {
   }
 
   // Step 4: Fix RBAC enum migration if needed (before running migrations)
-  console.log('\n🔧 Checking for RBAC enum migration issues...');
+  logWithTimestamp('\n🔧 Step 4: Checking for RBAC enum migration issues...');
   try {
     execSync('node scripts/fix-rbac-enum-migration.js', {
       stdio: 'inherit',
@@ -407,7 +431,7 @@ async function main() {
   }
 
   // Step 4.5: Fix missing columns (FCM, fuel_type, chassis_number, etc.)
-  console.log('\n🔧 Checking for missing database columns...');
+  logWithTimestamp('\n🔧 Step 4.5: Checking for missing database columns...');
   try {
     execSync('node scripts/fix-fcm-columns.js', {
       stdio: 'inherit',
@@ -431,7 +455,7 @@ async function main() {
   }
 
   // Step 4.7: Fix notification_logs table if missing
-  console.log('\n🔧 Checking for notification_logs table...');
+  logWithTimestamp('\n🔧 Step 4.7: Checking for notification_logs table...');
   try {
     execSync('node scripts/fix-notification-logs-table.js', {
       stdio: 'inherit',
@@ -444,7 +468,7 @@ async function main() {
   }
 
   // Step 4.8: Fix EnquiryCategory enum migration if it failed
-  console.log('\n🔧 Checking for EnquiryCategory enum migration issues...');
+  logWithTimestamp('\n🔧 Step 4.8: Checking for EnquiryCategory enum migration issues...');
   try {
     execSync('node scripts/fix-enquiry-category-enum-migration.js', {
       stdio: 'inherit',
@@ -457,7 +481,7 @@ async function main() {
   }
 
   // Step 4.9: Fix EnquirySource enum (add missing values like SHOWROOM_VISIT)
-  console.log('\n🔧 Checking for EnquirySource enum issues...');
+  logWithTimestamp('\n🔧 Step 4.9: Checking for EnquirySource enum issues...');
   try {
     execSync('node scripts/fix-enquiry-source-enum-migration.js', {
       stdio: 'inherit',
@@ -470,9 +494,10 @@ async function main() {
   }
 
   // Step 5: Resolve failed migration if it exists
+  logWithTimestamp('\n🔧 Step 5: Resolving failed migrations...');
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
-    console.log(`\n🔧 Attempting to resolve failed migration: ${failedMigrationName}...`);
+    console.log(`   Attempting to resolve: ${failedMigrationName}...`);
     execSync(`npx prisma migrate resolve --applied ${failedMigrationName}`, {
       stdio: 'inherit',
       env: process.env,
@@ -485,7 +510,7 @@ async function main() {
   }
 
   // Step 5.5: Add FCM columns if missing (safety measure)
-  console.log('\n🔧 Checking for FCM notification columns...');
+  logWithTimestamp('\n🔧 Step 5.5: Final check for FCM notification columns...');
   try {
     execSync('ts-node scripts/add-fcm-columns.ts', {
       stdio: 'inherit',
@@ -500,7 +525,7 @@ async function main() {
   // Step 5.7: (Removed - handled in Step 4.8 above with comprehensive fix script)
 
   // Step 6: Run migrations (required) - matches Render's current command
-  console.log('\n📦 Running database migrations...');
+  logWithTimestamp('\n📦 Step 6: Running database migrations...');
   console.log(`📊 Using DATABASE_URL: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 60) + '...' : 'NOT SET'}\n`);
   const migrationsSuccess = await runCommand(
     'npx prisma migrate deploy',
@@ -598,8 +623,9 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 6: Start application using absolute path
-  console.log('\n🚀 Starting application...\n');
+  // Step 7: Start application using absolute path
+  const deploymentElapsed = ((Date.now() - deploymentStartTime) / 1000).toFixed(0);
+  logWithTimestamp(`\n🚀 Step 7: Starting application (deployment setup took ${deploymentElapsed}s)...`);
   console.log(`📁 Using server file: ${distServerPath}\n`);
   console.log(`📁 Absolute path resolved: ${path.resolve(distServerPath)}\n`);
 
@@ -617,13 +643,35 @@ async function main() {
   // Use absolute path to start the server
   // Convert to absolute path to avoid any relative path issues
   const absoluteServerPath = path.resolve(distServerPath);
-  console.log(`🚀 Starting server with: node "${absoluteServerPath}"\n`);
+  console.log(`   Starting server with: node "${absoluteServerPath}"\n`);
+  
+  // Clear deployment timeout before starting server (server should run indefinitely)
+  clearDeploymentTimeout();
+  logWithTimestamp('✅ Deployment setup completed successfully, starting server...\n');
+  console.log('📊 Server startup logs will appear below. Server should start within 10-30 seconds.');
+  console.log('   If server fails to start, error messages will appear below.\n');
 
-  execSync(`node "${absoluteServerPath}"`, {
-    stdio: 'inherit',
-    env: process.env,
-    cwd: projectRoot, // Set cwd to project root
-  });
+  try {
+    // Start the server (this will block indefinitely, which is expected)
+    // The server process will keep running and handle requests
+    // If server crashes on startup, execSync will throw an error
+    execSync(`node "${absoluteServerPath}"`, {
+      stdio: 'inherit',
+      env: process.env,
+      cwd: projectRoot, // Set cwd to project root
+    });
+  } catch (error) {
+    const elapsed = ((Date.now() - deploymentStartTime) / 1000).toFixed(0);
+    console.error(`\n❌ Server startup failed after ${elapsed} seconds`);
+    console.error('   Error:', error.message);
+    console.error('   Check the logs above for server startup errors');
+    console.error('   Common issues:');
+    console.error('     - Database connection failed');
+    console.error('     - Port already in use');
+    console.error('     - Missing environment variables');
+    console.error('     - Application code errors');
+    process.exit(1);
+  }
 }
 
 main().catch((error) => {
