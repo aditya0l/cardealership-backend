@@ -104,6 +104,65 @@ async function runCommand(command, description) {
   }
 }
 
+/**
+ * Check migration status in database
+ * Returns: 'applied', 'failed', 'in_progress', or 'not_found'
+ */
+async function checkMigrationStatus(migrationName) {
+  const { PrismaClient } = require('@prisma/client');
+  const prisma = new PrismaClient({
+    log: ['error', 'warn'],
+  });
+
+  try {
+    await prisma.$connect();
+
+    // Check if migrations table exists
+    const migrationsTableExists = await prisma.$queryRawUnsafe(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = '_prisma_migrations'
+      );
+    `);
+
+    if (!migrationsTableExists[0]?.exists) {
+      await prisma.$disconnect();
+      return 'not_found';
+    }
+
+    // Check migration status
+    const migrationStatus = await prisma.$queryRawUnsafe(`
+      SELECT migration_name, finished_at, success, started_at
+      FROM "_prisma_migrations"
+      WHERE migration_name = '${migrationName.replace(/'/g, "''")}';
+    `);
+
+    await prisma.$disconnect();
+
+    if (!migrationStatus || migrationStatus.length === 0) {
+      return 'not_found';
+    }
+
+    const migration = migrationStatus[0];
+    if (migration.finished_at && migration.success) {
+      return 'applied';
+    } else if (migration.finished_at && !migration.success) {
+      return 'failed';
+    } else {
+      return 'in_progress';
+    }
+  } catch (error) {
+    try {
+      await prisma.$disconnect();
+    } catch (e) {
+      // Ignore disconnect errors
+    }
+    // Return 'not_found' on error to be safe
+    return 'not_found';
+  }
+}
+
 // Find project root by looking for package.json
 // Handle case where we might be in /opt/render/project/src
 function findProjectRoot(startPath = process.cwd()) {
@@ -308,16 +367,30 @@ async function main() {
   // Step 3: Try to resolve any rolled-back migrations (non-blocking) - matches Render's current command
   const migrationName = '20251002200510_update_rbac_roles';
   try {
-    console.log(`\n🔧 Attempting to resolve rolled-back migration: ${migrationName}...`);
-    execSync(`npx prisma migrate resolve --rolled-back ${migrationName}`, {
-      stdio: 'inherit',
-      env: process.env,
-      timeout: 30000,
-    });
-    console.log('✅ Migration resolved successfully');
+    console.log(`\n🔧 Checking status of migration: ${migrationName}...`);
+    const status = await checkMigrationStatus(migrationName);
+    console.log(`📊 Migration status: ${status}`);
+
+    if (status === 'applied') {
+      console.log('✅ Migration already applied - skipping resolution');
+    } else if (status === 'failed' || status === 'in_progress') {
+      console.log(`🔧 Attempting to resolve ${status} migration: ${migrationName}...`);
+      try {
+        execSync(`npx prisma migrate resolve --rolled-back ${migrationName}`, {
+          stdio: 'inherit',
+          env: process.env,
+          timeout: 30000,
+        });
+        console.log('✅ Migration resolved successfully');
+      } catch (resolveError) {
+        console.log('⚠️  Could not resolve migration (this is OK if it doesn\'t need resolution)');
+      }
+    } else {
+      console.log('ℹ️  Migration not found in database - will be applied normally');
+    }
   } catch (error) {
     // This is expected if migration doesn't exist or already resolved
-    console.log('⚠️  Could not resolve migration (this is OK if migration doesn\'t exist or already resolved)');
+    console.log('⚠️  Could not check migration status (this is OK if migration doesn\'t exist or already resolved)');
   }
 
   // Step 4: Fix RBAC enum migration if needed (before running migrations)
@@ -370,6 +443,19 @@ async function main() {
     console.log('⚠️  Notification logs table fix skipped (this is OK if not needed)');
   }
 
+  // Step 4.8: Fix EnquiryCategory enum migration if it failed
+  console.log('\n🔧 Checking for EnquiryCategory enum migration issues...');
+  try {
+    execSync('node scripts/fix-enquiry-category-enum-migration.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ EnquiryCategory enum migration check completed');
+  } catch (error) {
+    console.log('⚠️  EnquiryCategory enum migration fix skipped (this is OK if not needed)');
+  }
+
   // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
@@ -398,20 +484,7 @@ async function main() {
     console.log('⚠️  FCM columns check skipped (this is OK if columns already exist or migration will handle it)');
   }
 
-  // Step 5.7: Resolve failed enum migration if it exists
-  const enumMigrationName = '20251221_fix_enquiry_category_enum';
-  try {
-    console.log(`\n🔧 Attempting to resolve failed enum migration: ${enumMigrationName}...`);
-    execSync(`npx prisma migrate resolve --rolled-back ${enumMigrationName}`, {
-      stdio: 'inherit',
-      env: process.env,
-      timeout: 30000,
-    });
-    console.log('✅ Failed enum migration resolved');
-  } catch (error) {
-    // This is expected if migration doesn't exist or already resolved
-    console.log('⚠️  Could not resolve enum migration (this is OK if it doesn\'t exist or not failed)');
-  }
+  // Step 5.7: (Removed - handled in Step 4.8 above with comprehensive fix script)
 
   // Step 6: Run migrations (required) - matches Render's current command
   console.log('\n📦 Running database migrations...');
@@ -423,30 +496,55 @@ async function main() {
 
   if (!migrationsSuccess) {
     console.error('\n❌ Migration deployment failed');
-    console.error('   Attempting to resolve failed migration and retry...');
+    console.error('   Attempting to fix failed migrations and retry...');
 
-    // Try to fix RBAC enum migration and retry
+    // Try to fix enum migrations and retry
     try {
-      console.log(`\n🔧 Fixing RBAC enum migration and retrying...`);
-      execSync('node scripts/fix-rbac-enum-migration.js', {
-        stdio: 'inherit',
-        env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
-        timeout: 30000,
-      });
-
-      // Try to resolve the failed migration
+      console.log(`\n🔧 Fixing enum migrations and retrying...`);
+      
+      // Fix EnquiryCategory enum migration
       try {
-        execSync(`npx prisma migrate resolve --applied 20251002200510_update_rbac_roles`, {
+        execSync('node scripts/fix-enquiry-category-enum-migration.js', {
           stdio: 'inherit',
-          env: process.env,
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
           timeout: 30000,
         });
-        console.log('✅ RBAC migration resolved');
+        console.log('✅ EnquiryCategory enum migration fix attempted');
+      } catch (enumFixError) {
+        console.log('⚠️  Could not fix EnquiryCategory enum migration (may already be fixed)');
+      }
+
+      // Fix RBAC enum migration
+      try {
+        execSync('node scripts/fix-rbac-enum-migration.js', {
+          stdio: 'inherit',
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+          timeout: 30000,
+        });
+        console.log('✅ RBAC enum migration fix attempted');
+      } catch (rbacFixError) {
+        console.log('⚠️  Could not fix RBAC enum migration (may already be fixed)');
+      }
+
+      // Check RBAC migration status before attempting resolution
+      try {
+        const rbacStatus = await checkMigrationStatus('20251002200510_update_rbac_roles');
+        if (rbacStatus === 'failed' || rbacStatus === 'in_progress') {
+          console.log(`🔧 Attempting to resolve RBAC migration (status: ${rbacStatus})...`);
+          execSync(`npx prisma migrate resolve --applied 20251002200510_update_rbac_roles`, {
+            stdio: 'inherit',
+            env: process.env,
+            timeout: 30000,
+          });
+          console.log('✅ RBAC migration resolved');
+        } else {
+          console.log(`ℹ️  RBAC migration status: ${rbacStatus} - skipping resolution`);
+        }
       } catch (resolveError) {
         console.log('⚠️  Could not resolve RBAC migration (might already be resolved)');
       }
 
-      console.log('✅ Enum fix completed, retrying migrations...');
+      console.log('✅ Migration fixes completed, retrying migrations...');
 
       // Retry migrations
       const retrySuccess = await runCommand(
@@ -457,11 +555,13 @@ async function main() {
       if (!retrySuccess) {
         console.error('\n❌ Migration deployment failed after retry');
         console.error('   Please check database connection and migration status');
+        console.error('   You may need to manually resolve failed migrations');
         process.exit(1);
       }
     } catch (fixError) {
-      console.error('\n❌ Could not fix enum migration');
+      console.error('\n❌ Could not fix migrations:', fixError.message);
       console.error('   Please check database connection and migration status');
+      console.error('   You may need to manually resolve failed migrations');
       process.exit(1);
     }
   }

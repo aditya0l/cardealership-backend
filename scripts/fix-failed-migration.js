@@ -51,7 +51,8 @@ async function fixFailedMigration() {
         '20251011_add_employee_hierarchy_stock_and_models',
         '20251011060000_cleanup_failed_migration',
         '20251014_multitenant_dealership_required',
-        '20250102200000_add_fuel_type_to_enquiry'
+        '20250102200000_add_fuel_type_to_enquiry',
+        '20251221_fix_enquiry_category_enum'
       )
       AND finished_at IS NULL;
     `);
