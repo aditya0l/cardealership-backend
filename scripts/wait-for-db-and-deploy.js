@@ -133,7 +133,7 @@ async function checkMigrationStatus(migrationName) {
 
     // Check migration status
     const migrationStatus = await prisma.$queryRawUnsafe(`
-      SELECT migration_name, finished_at, success, started_at
+      SELECT migration_name, finished_at, started_at
       FROM "_prisma_migrations"
       WHERE migration_name = '${migrationName.replace(/'/g, "''")}';
     `);
@@ -145,10 +145,10 @@ async function checkMigrationStatus(migrationName) {
     }
 
     const migration = migrationStatus[0];
-    if (migration.finished_at && migration.success) {
+    // finished_at IS NOT NULL means migration completed successfully
+    // finished_at IS NULL means migration is in progress or failed
+    if (migration.finished_at) {
       return 'applied';
-    } else if (migration.finished_at && !migration.success) {
-      return 'failed';
     } else {
       return 'in_progress';
     }

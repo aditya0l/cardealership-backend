@@ -9,25 +9,23 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 
--- Step 2: Update existing data to map old values to new values
+-- Step 2: Alter the column to use the new enum type, mapping old values to new values during conversion
 -- SALES -> HOT (high priority sales enquiry)
 -- SERVICE -> LOST (service enquiries are not sales, mark as lost)
 -- PARTS -> LOST (parts enquiries are not sales, mark as lost)
 -- GENERAL -> HOT (general enquiries default to hot)
-UPDATE "enquiries" 
-SET "category" = (CASE 
-  WHEN "category"::text = 'SALES' THEN 'HOT'
-  WHEN "category"::text = 'SERVICE' THEN 'LOST'
-  WHEN "category"::text = 'PARTS' THEN 'LOST'
-  WHEN "category"::text = 'GENERAL' THEN 'HOT'
-  ELSE 'HOT'
-END)::"EnquiryCategory_new"
-WHERE "category" IS NOT NULL;
-
--- Step 3: Alter the column to use the new enum type
 ALTER TABLE "enquiries" 
   ALTER COLUMN "category" TYPE "EnquiryCategory_new" 
-  USING "category"::text::"EnquiryCategory_new";
+  USING (
+    CASE 
+      WHEN "category"::text = 'SALES' THEN 'HOT'::"EnquiryCategory_new"
+      WHEN "category"::text = 'SERVICE' THEN 'LOST'::"EnquiryCategory_new"
+      WHEN "category"::text = 'PARTS' THEN 'LOST'::"EnquiryCategory_new"
+      WHEN "category"::text = 'GENERAL' THEN 'HOT'::"EnquiryCategory_new"
+      WHEN "category"::text IN ('HOT', 'LOST', 'BOOKED') THEN "category"::text::"EnquiryCategory_new"
+      ELSE 'HOT'::"EnquiryCategory_new"
+    END
+  );
 
 -- Step 4: Drop the old enum type
 DROP TYPE IF EXISTS "EnquiryCategory";

@@ -46,7 +46,7 @@ async function fixEnquiryCategoryEnumMigration() {
 
     // Step 2: Check migration status
     const migrationStatus = await prisma.$queryRawUnsafe(`
-      SELECT migration_name, finished_at, success, started_at
+      SELECT migration_name, finished_at, started_at
       FROM "_prisma_migrations"
       WHERE migration_name = '20251221_fix_enquiry_category_enum';
     `);
@@ -58,12 +58,13 @@ async function fixEnquiryCategoryEnumMigration() {
       process.exit(0);
     }
     
-    if (migration.finished_at && migration.success) {
+    // finished_at IS NOT NULL means migration completed successfully
+    if (migration.finished_at) {
       console.log('✅ Migration already completed successfully');
       process.exit(0);
     }
     
-    console.log(`📊 Migration status: ${migration.finished_at ? 'FAILED' : 'IN_PROGRESS'}`);
+    console.log(`📊 Migration status: IN_PROGRESS (finished_at is NULL)`);
     
     // Step 3: Check current enum state
     console.log('\n📊 Checking current enum state...');
@@ -148,8 +149,7 @@ async function fixEnquiryCategoryEnumMigration() {
       
       await prisma.$executeRawUnsafe(`
         UPDATE "_prisma_migrations"
-        SET finished_at = NOW(),
-            success = true
+        SET finished_at = NOW()
         WHERE migration_name = '20251221_fix_enquiry_category_enum'
         AND finished_at IS NULL;
       `);

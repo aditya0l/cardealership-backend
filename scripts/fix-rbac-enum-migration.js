@@ -153,8 +153,7 @@ async function fixRbacEnumMigration() {
     try {
       await prisma.$executeRawUnsafe(`
         UPDATE "_prisma_migrations" 
-        SET finished_at = NOW(), 
-            success = true
+        SET finished_at = NOW()
         WHERE migration_name = '20251002200510_update_rbac_roles' 
           AND finished_at IS NULL;
       `);
