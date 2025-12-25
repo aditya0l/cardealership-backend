@@ -155,6 +155,42 @@ async function fixMissingColumns() {
       console.warn('⚠️  Could not add bookings.next_follow_up_date:', error.message);
     }
 
+    // Fix bookings.last_follow_up_date (if missing)
+    try {
+      const bookingLastFollowUpCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'bookings' AND column_name = 'last_follow_up_date'
+      `;
+      
+      if (bookingLastFollowUpCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "last_follow_up_date" TIMESTAMP(3)`;
+        console.log('✅ Added bookings.last_follow_up_date column');
+      } else {
+        console.log('⏭️  bookings.last_follow_up_date column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add bookings.last_follow_up_date:', error.message);
+    }
+
+    // Fix bookings.follow_up_count (if missing)
+    try {
+      const bookingFollowUpCountCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'bookings' AND column_name = 'follow_up_count'
+      `;
+      
+      if (bookingFollowUpCountCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "follow_up_count" INTEGER DEFAULT 0 NOT NULL`;
+        console.log('✅ Added bookings.follow_up_count column');
+      } else {
+        console.log('⏭️  bookings.follow_up_count column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add bookings.follow_up_count:', error.message);
+    }
+
     // Fix enquiries.is_imported_from_quotation (if missing)
     try {
       const isImportedCheck = await prisma.$queryRaw`
@@ -189,6 +225,24 @@ async function fixMissingColumns() {
       }
     } catch (error) {
       console.warn('⚠️  Could not add enquiries.quotation_imported_at:', error.message);
+    }
+
+    // Fix bookings.vahan_date (if missing)
+    try {
+      const vahanDateCheck = await prisma.$queryRaw`
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'bookings' AND column_name = 'vahan_date'
+      `;
+      
+      if (vahanDateCheck.length === 0) {
+        await prisma.$executeRaw`ALTER TABLE "bookings" ADD COLUMN IF NOT EXISTS "vahan_date" TIMESTAMP(3)`;
+        console.log('✅ Added bookings.vahan_date column');
+      } else {
+        console.log('⏭️  bookings.vahan_date column already exists');
+      }
+    } catch (error) {
+      console.warn('⚠️  Could not add bookings.vahan_date:', error.message);
     }
 
     console.log('✅ Missing columns check complete!');
