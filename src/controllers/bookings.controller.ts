@@ -145,7 +145,25 @@ export const createBooking = asyncHandler(async (req: AuthenticatedRequest, res:
 
   } catch (error: any) {
     console.error('Error creating booking:', error);
-    throw createError('Failed to create booking', 500);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error meta:', error.meta);
+    
+    // Provide more specific error messages based on Prisma error codes
+    if (error.code === 'P2002') {
+      throw createError('A booking with this unique field already exists', 400);
+    } else if (error.code === 'P2003') {
+      throw createError('Invalid foreign key reference in booking data', 400);
+    } else if (error.code === 'P2025') {
+      throw createError('Related record not found', 404);
+    } else if (error.code === 'P2010') {
+      throw createError('Database schema error: column may not exist', 500);
+    } else if (error.message && error.message.includes('Unknown arg')) {
+      throw createError(`Invalid field in booking data: ${error.message}`, 400);
+    }
+    
+    throw createError(`Failed to create booking: ${error.message || 'Unknown error'}`, 500);
   }
 });
 
@@ -243,8 +261,22 @@ export const getBookings = asyncHandler(async (req: AuthenticatedRequest, res: R
 
   } catch (error: any) {
     console.error('Error fetching bookings:', error);
-    console.error('Error details:', error.message, error.stack);
-    throw createError('Failed to fetch bookings', 500);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error meta:', error.meta);
+    console.error('Error stack:', error.stack);
+    
+    // Provide more specific error messages based on Prisma error codes
+    if (error.code === 'P2010') {
+      throw createError('Database schema error: column may not exist', 500);
+    } else if (error.code === 'P2001') {
+      throw createError('Record not found', 404);
+    } else if (error.message && error.message.includes('Unknown arg')) {
+      throw createError(`Invalid query parameter: ${error.message}`, 400);
+    }
+    
+    throw createError(`Failed to fetch bookings: ${error.message || 'Unknown error'}`, 500);
   }
 });
 
@@ -663,11 +695,26 @@ export const getAdvisorBookings = asyncHandler(async (req: AuthenticatedRequest,
 
   } catch (error: any) {
     console.error('Error fetching advisor bookings:', error);
-    console.error('Error details:', error.message, error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    console.error('Error meta:', error.meta);
+    console.error('Error stack:', error.stack);
+    
     if (error.message.includes('Invalid timeline')) {
       throw error;
     }
-    throw createError('Failed to fetch your bookings', 500);
+    
+    // Provide more specific error messages based on Prisma error codes
+    if (error.code === 'P2010') {
+      throw createError('Database schema error: column may not exist', 500);
+    } else if (error.code === 'P2001') {
+      throw createError('Record not found', 404);
+    } else if (error.message && error.message.includes('Unknown arg')) {
+      throw createError(`Invalid query parameter: ${error.message}`, 400);
+    }
+    
+    throw createError(`Failed to fetch your bookings: ${error.message || 'Unknown error'}`, 500);
   }
 });
 

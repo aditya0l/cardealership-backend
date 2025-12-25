@@ -456,6 +456,19 @@ async function main() {
     console.log('⚠️  EnquiryCategory enum migration fix skipped (this is OK if not needed)');
   }
 
+  // Step 4.9: Fix EnquirySource enum (add missing values like SHOWROOM_VISIT)
+  console.log('\n🔧 Checking for EnquirySource enum issues...');
+  try {
+    execSync('node scripts/fix-enquiry-source-enum-migration.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ EnquirySource enum check completed');
+  } catch (error) {
+    console.log('⚠️  EnquirySource enum fix skipped (this is OK if not needed)');
+  }
+
   // Step 5: Resolve failed migration if it exists
   const failedMigrationName = '20250102200000_add_fuel_type_to_enquiry';
   try {
@@ -512,6 +525,18 @@ async function main() {
         console.log('✅ EnquiryCategory enum migration fix attempted');
       } catch (enumFixError) {
         console.log('⚠️  Could not fix EnquiryCategory enum migration (may already be fixed)');
+      }
+
+      // Fix EnquirySource enum migration
+      try {
+        execSync('node scripts/fix-enquiry-source-enum-migration.js', {
+          stdio: 'inherit',
+          env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+          timeout: 30000,
+        });
+        console.log('✅ EnquirySource enum migration fix attempted');
+      } catch (sourceEnumFixError) {
+        console.log('⚠️  Could not fix EnquirySource enum migration (may already be fixed)');
       }
 
       // Fix RBAC enum migration
