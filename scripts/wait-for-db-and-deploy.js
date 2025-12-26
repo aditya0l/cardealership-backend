@@ -467,6 +467,19 @@ async function main() {
     console.log('⚠️  Notification logs table fix skipped (this is OK if not needed)');
   }
 
+  // Step 4.7.5: Fix remarks table if missing
+  logWithTimestamp('\n🔧 Step 4.7.5: Checking for remarks table...');
+  try {
+    execSync('node scripts/fix-remarks-table.js', {
+      stdio: 'inherit',
+      env: { ...process.env, DATABASE_URL: process.env.DATABASE_URL },
+      timeout: 30000,
+    });
+    console.log('✅ Remarks table check completed');
+  } catch (error) {
+    console.log('⚠️  Remarks table fix skipped (this is OK if not needed)');
+  }
+
   // Step 4.8: Fix EnquiryCategory enum migration if it failed
   logWithTimestamp('\n🔧 Step 4.8: Checking for EnquiryCategory enum migration issues...');
   try {
