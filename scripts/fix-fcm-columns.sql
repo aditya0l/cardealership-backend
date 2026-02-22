@@ -12,3 +12,8 @@ FROM information_schema.columns
 WHERE table_name = 'users' 
 AND column_name IN ('fcm_token', 'device_type', 'last_token_updated');
 
+
+
+
+
+
